@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ignore SSH keys and private secrets
+id_ed25519
+id_ed25519.pub
+ssh-keygen*
+*.pem
+*.key
