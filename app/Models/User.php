@@ -4,13 +4,16 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public const ROLES = ['job_seeker', 'employer', 'admin'];
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -21,6 +24,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'status',
+        'role',
     ];
 
     /**
@@ -43,6 +48,16 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'status' => 'boolean',
         ];
+    }
+
+    public function employer(): HasOne { return $this->hasOne(Employer::class); }
+    public function jobSeeker(): HasOne { return $this->hasOne(JobSeeker::class); }
+    public function notifications(): HasMany { return $this->hasMany(Notification::class); }
+
+    public function updateProfile(array $attributes): bool
+    {
+        return $this->fill($attributes)->save();
     }
 }
