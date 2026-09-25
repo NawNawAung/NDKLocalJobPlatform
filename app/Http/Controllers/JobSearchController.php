@@ -79,6 +79,13 @@ class JobSearchController extends Controller
         };
 
         $results = $jobs->paginate(12)->withQueryString();
+        $applicationStatuses = collect();
+        $seeker = $request->user()?->role === 'job_seeker' ? $request->user()->jobSeeker : null;
+        if ($seeker && $results->getCollection()->isNotEmpty()) {
+            $applicationStatuses = $seeker->applications()
+                ->whereIn('job_id', $results->getCollection()->pluck('id'))
+                ->pluck('status', 'job_id');
+        }
 
         return response()->json([
             'data' => $results->getCollection()->map(fn (Job $job) => [
@@ -96,6 +103,7 @@ class JobSearchController extends Controller
                 'salary_max' => $job->salary_max,
                 'salary_currency' => $job->salary_currency,
                 'posted_at' => $job->posted_at?->toIso8601String(),
+                'application_status' => $applicationStatuses->get($job->id),
             ]),
             'meta' => [
                 'current_page' => $results->currentPage(),

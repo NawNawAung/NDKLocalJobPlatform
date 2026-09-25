@@ -13,9 +13,9 @@ class JobSeeker extends Model
         'user_id', 'region_id', 'township_id', 'phone', 'profile_photo_path', 'cv_path', 'cv_original_name',
         'professional_title', 'years_experience', 'desired_job_title', 'employment_type',
         'work_mode', 'expected_salary_min', 'expected_salary_max', 'availability',
-        'skills', 'languages', 'status', 'bio',
+        'skills', 'languages', 'status', 'job_alerts_enabled', 'bio',
     ];
-    protected function casts(): array { return ['skills' => 'array', 'languages' => 'array', 'status' => 'boolean']; }
+    protected function casts(): array { return ['skills' => 'array', 'languages' => 'array', 'status' => 'boolean', 'job_alerts_enabled' => 'boolean']; }
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function region(): BelongsTo { return $this->belongsTo(Region::class); }

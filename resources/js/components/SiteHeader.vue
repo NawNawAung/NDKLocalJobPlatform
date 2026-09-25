@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
+import NotificationBell from './NotificationBell.vue';
 
 const props = defineProps({
     isAuthenticated: { type: Boolean, default: false },
@@ -48,7 +49,7 @@ function isActive(link) {
         return currentPath.value === '/' && !currentHash.value && pageType !== 'search';
     }
     if (link.href === '/#search' && pageType === 'search' && !currentHash.value) return true;
-    if (link.href === '/#search' && currentHash.value === '#details') return true;
+    if (link.href === '/#search' && currentHash.value.startsWith('#details')) return true;
     if (link.href === '/#dashboard' && currentHash.value === '#post-job') return true;
     return currentHash.value === link.href.slice(1);
 }
@@ -67,6 +68,7 @@ function isActive(link) {
 
             <div class="hidden shrink-0 items-center gap-3 md:flex">
                 <template v-if="isAuthenticated">
+                    <NotificationBell />
                     <a v-if="userRole === 'employer'" href="/#post-job" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">Post a Job</a>
                     <form action="/logout" method="post">
                         <input type="hidden" name="_token" :value="csrfToken">
@@ -78,6 +80,8 @@ function isActive(link) {
                     <a href="/register" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">Create account</a>
                 </template>
             </div>
+
+            <NotificationBell v-if="isAuthenticated" class="md:hidden" />
 
             <button type="button" class="grid h-10 w-10 place-items-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 xl:hidden" :aria-expanded="menuOpen" aria-label="Toggle navigation" @click="menuOpen = !menuOpen">
                 <i :class="menuOpen ? 'ti ti-x' : 'ti ti-menu-2'" aria-hidden="true" />

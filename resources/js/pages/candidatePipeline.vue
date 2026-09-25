@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import InterviewSchedulerModal from '../components/modal.vue';
 
 const loading = ref(true);
 const error = ref('');
@@ -10,7 +11,8 @@ const search = ref('');
 const jobFilter = ref('');
 const statusFilter = ref('');
 const scheduleFor = ref(null);
-const scheduleForm = reactive({ interview_at: '', interview_type: 'online', meeting_url: '', notes: '' });
+const scheduleSaving = ref(false);
+const scheduleError = ref('');
 const statuses = ['submitted', 'reviewing', 'shortlisted', 'interview', 'offered', 'hired', 'rejected'];
 const updateStatuses = statuses.filter((status) => status !== 'submitted');
 let searchTimer;
@@ -46,18 +48,23 @@ async function messageCandidate(application) {
     } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not open a conversation.'; }
 }
 
-async function scheduleInterview() {
+async function scheduleInterview(scheduleForm) {
     if (!scheduleFor.value) return;
-    error.value = '';
+    scheduleError.value = '';
+    scheduleSaving.value = true;
     try {
         await window.axios.post(`/api/employer/applications/${scheduleFor.value.id}/interviews`, scheduleForm);
         scheduleFor.value.status = 'interview';
         notice.value = 'Interview scheduled and candidate status updated.';
         scheduleFor.value = null;
-        Object.assign(scheduleForm, { interview_at: '', interview_type: 'online', meeting_url: '', notes: '' });
     } catch (exception) {
-        error.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not schedule the interview.';
-    }
+        scheduleError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not schedule the interview.';
+    } finally { scheduleSaving.value = false; }
+}
+
+function openScheduler(application) {
+    scheduleError.value = '';
+    scheduleFor.value = application;
 }
 
 watch([jobFilter, statusFilter], loadCandidates);
@@ -77,13 +84,13 @@ onMounted(loadCandidates);
                 <article v-for="application in applications" :key="application.id" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex flex-wrap items-start justify-between gap-4"><div class="flex min-w-0 gap-3"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-100 text-lg font-bold text-blue-900">{{ application.candidate.name?.slice(0, 1)?.toUpperCase() || '?' }}</span><div class="min-w-0"><h2 class="truncate text-lg font-bold text-slate-900">{{ application.candidate.name }}</h2><p class="mt-0.5 text-sm text-slate-700">{{ application.candidate.title || 'Professional title not provided' }}</p><p class="mt-1 text-xs text-slate-500">{{ application.job_title }} · {{ application.candidate.location || 'Location not provided' }}<span v-if="application.candidate.experience !== null"> · {{ application.candidate.experience }} years experience</span></p><p class="mt-1 text-xs text-slate-500">Applied {{ application.submitted_at ? new Date(application.submitted_at).toLocaleDateString() : '—' }}</p></div></div><label class="text-xs font-semibold text-slate-500">Application stage<select :value="application.status" class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold capitalize text-slate-800" @change="updateStatus(application, $event.target.value)"><option v-for="status in updateStatuses" :key="status" :value="status">{{ status.replaceAll('_', ' ') }}</option></select></label></div>
                     <div v-if="application.candidate.skills?.length" class="mt-4 flex flex-wrap gap-2"><span v-for="skill in application.candidate.skills" :key="skill" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ skill }}</span></div><p v-if="application.cover_letter" class="mt-4 whitespace-pre-line rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{{ application.cover_letter }}</p>
-                    <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><a v-if="application.candidate.has_cv" :href="`/api/employer/applications/${application.id}/resume`" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="ti ti-download" aria-hidden="true"/>Download CV</a><span v-else class="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500"><i class="ti ti-file-off" aria-hidden="true"/>No CV provided</span><button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" @click="messageCandidate(application)"><i class="ti ti-message" aria-hidden="true"/>Message candidate</button><button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="scheduleFor = application"><i class="ti ti-calendar-plus" aria-hidden="true"/>Schedule interview</button></div>
+                    <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><a v-if="application.candidate.has_cv" :href="`/api/employer/applications/${application.id}/resume`" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="ti ti-download" aria-hidden="true"/>Download CV</a><span v-else class="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500"><i class="ti ti-file-off" aria-hidden="true"/>No CV provided</span><button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" @click="messageCandidate(application)"><i class="ti ti-message" aria-hidden="true"/>Message candidate</button><button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openScheduler(application)"><i class="ti ti-calendar-plus" aria-hidden="true"/>Schedule interview</button></div>
                 </article>
             </div>
             <div v-else class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center"><i class="ti ti-users mx-auto text-4xl text-slate-300" aria-hidden="true"/><h2 class="mt-3 font-semibold text-slate-800">No matching applicants</h2><p class="mt-1 text-sm text-slate-500">Applications to your job listings will appear here.</p><a href="/#post-job" class="mt-4 inline-flex rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white">Post a job</a></div>
         </div>
 
-        <div v-if="scheduleFor" class="fixed inset-0 z-[60] grid place-items-center bg-slate-950/40 p-4" @click.self="scheduleFor = null"><form class="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-xl" @submit.prevent="scheduleInterview"><div><h2 class="text-lg font-bold text-slate-900">Schedule an interview</h2><p class="mt-1 text-sm text-slate-600">{{ scheduleFor.candidate.name }} · {{ scheduleFor.job_title }}</p></div><label class="block text-sm font-semibold text-slate-700">Date and time<input v-model="scheduleForm.interview_at" required type="datetime-local" class="filter-field mt-1"></label><label class="block text-sm font-semibold text-slate-700">Interview type<select v-model="scheduleForm.interview_type" class="filter-field mt-1"><option value="online">Online</option><option value="phone">Phone</option><option value="in_person">In person</option></select></label><label v-if="scheduleForm.interview_type === 'online'" class="block text-sm font-semibold text-slate-700">Meeting URL (optional)<input v-model="scheduleForm.meeting_url" type="url" class="filter-field mt-1" placeholder="https://…"></label><label class="block text-sm font-semibold text-slate-700">Notes (optional)<textarea v-model="scheduleForm.notes" rows="3" class="filter-field mt-1" placeholder="Anything the candidate should know"></textarea></label><div class="flex justify-end gap-2"><button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700" @click="scheduleFor = null">Cancel</button><button class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white">Schedule</button></div></form></div>
+        <InterviewSchedulerModal :open="Boolean(scheduleFor)" :candidate-name="scheduleFor?.candidate.name ?? ''" :saving="scheduleSaving" :error-message="scheduleError" @close="scheduleFor = null" @submit="scheduleInterview" />
     </section>
 </template>
 

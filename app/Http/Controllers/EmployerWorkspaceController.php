@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\Interview;
 use App\Models\Job;
 use App\Models\Notification;
+use App\Models\JobSeeker;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -147,6 +149,7 @@ class EmployerWorkspaceController extends Controller
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }
         $job = $employer->postJob([...$data, 'status' => 'published', 'posted_at' => now(), 'salary_currency' => 'MMK']);
+        $this->notifyJobAlertSubscribers($job);
         return response()->json(['message' => 'Job published.', 'job' => $job], 201);
     }
 
@@ -188,7 +191,7 @@ class EmployerWorkspaceController extends Controller
         abort_unless($application->job()->where('employer_id', $employer->id)->exists(), 404);
         $data = $request->validate(['status' => ['required', Rule::in(['reviewing', 'shortlisted', 'interview', 'offered', 'hired', 'rejected'])]]);
         $application->updateStatus($data['status']);
-        Notification::sendNotification($application->jobSeeker->user, 'Application update', "Your application for {$application->job->title} is now {$data['status']}.");
+        Notification::sendNotification($application->jobSeeker->user, 'Application update', "Your application for {$application->job->title} is now {$data['status']}.", null, 'application', '/profile');
         return response()->json(['message' => 'Application status updated.', 'status' => $application->status]);
     }
 
@@ -211,9 +214,34 @@ class EmployerWorkspaceController extends Controller
             'meeting_url' => ['nullable', 'url', 'max:2000'],
             'notes' => ['nullable', 'string', 'max:3000'],
         ]);
+        $data['interview_at'] = Carbon::parse($data['interview_at'])->utc();
         $interview = $employer->scheduleInterview($application, $data);
         $application->update(['status' => 'interview']);
-        Notification::sendNotification($application->jobSeeker->user, 'Interview scheduled', "An interview for {$application->job->title} has been scheduled for {$interview->interview_at->format('M j, Y g:i A')}.");
+        Notification::sendNotification($application->jobSeeker->user, 'Interview scheduled', "An interview for {$application->job->title} has been scheduled for {$interview->interview_at->setTimezone('Asia/Yangon')->format('M j, Y g:i A')} Myanmar time.", null, 'interview', '/profile');
         return response()->json(['message' => 'Interview scheduled.', 'interview' => $interview], 201);
+    }
+
+    private function notifyJobAlertSubscribers(Job $job): void
+    {
+        $companyName = $job->employer?->company_name ?: 'An employer';
+        $actionUrl = '/jobs?category='.rawurlencode($job->category);
+
+        JobSeeker::query()
+            ->where('status', true)
+            ->where('job_alerts_enabled', true)
+            ->with('user:id,name')
+            ->chunkById(200, function ($jobSeekers) use ($job, $companyName, $actionUrl) {
+                foreach ($jobSeekers as $jobSeeker) {
+                    if (! $jobSeeker->user) continue;
+                    Notification::sendNotification(
+                        $jobSeeker->user,
+                        'New job listing',
+                        "{$companyName} published {$job->title} in {$job->location}.",
+                        null,
+                        'job',
+                        $actionUrl,
+                    );
+                }
+            });
     }
 }

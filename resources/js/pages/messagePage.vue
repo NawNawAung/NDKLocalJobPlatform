@@ -29,6 +29,7 @@ let activeConversationRequest = 0;
 
 const selectedConversation = computed(() => conversations.value.find((conversation) => conversation.id === selectedConversationId.value) ?? null);
 const recipientName = computed(() => selectedConversation.value?.other_participant?.name ?? 'your conversation partner');
+const recipientLabel = computed(() => selectedConversation.value?.other_participant?.role === 'employer' ? 'Employer' : 'Job seeker');
 const filteredConversations = computed(() => conversationFilter.value === 'unread'
     ? conversations.value.filter((conversation) => conversation.unread_count > 0)
     : conversations.value);
@@ -263,7 +264,6 @@ onUnmounted(() => {
                         <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-900">{{ conversation.other_participant?.name?.slice(0, 1)?.toUpperCase() ?? '?' }}</span>
                         <span class="min-w-0 flex-1">
                             <span class="flex items-center justify-between gap-2"><span class="truncate text-sm font-semibold text-slate-900">{{ conversation.other_participant?.name ?? 'Conversation' }}</span><time class="shrink-0 text-xs text-slate-400">{{ formatTime(conversation.updated_at) }}</time></span>
-                            <span v-if="conversation.job_title" class="mt-1 block truncate text-xs font-medium text-blue-800">{{ conversation.job_title }}</span>
                             <span class="mt-1 flex items-center justify-between gap-2"><span class="truncate text-xs text-slate-500">{{ messagePreview(conversation.last_message) }}</span><span v-if="conversation.unread_count" class="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-blue-700 px-1.5 text-[11px] font-bold text-white">{{ conversation.unread_count }}</span></span>
                         </span>
                     </button>
@@ -276,7 +276,7 @@ onUnmounted(() => {
                     <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-900">{{ recipientName.slice(0, 1).toUpperCase() }}</span>
                     <div class="min-w-0 flex-1">
                         <h2 class="truncate font-bold text-slate-900">{{ recipientName }}</h2>
-                        <p class="truncate text-xs text-slate-500">{{ selectedConversation.job_title ? `Application: ${selectedConversation.job_title}` : 'Job platform conversation' }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ recipientLabel }}</p>
                     </div>
                     <span class="hidden rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 sm:inline-flex">Private conversation</span>
                 </header>

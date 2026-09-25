@@ -195,6 +195,7 @@ const availabilityOptions = [
                             <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Employment type</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(employmentOptions, profile.employment_type) || 'Not specified' }}</dd></div>
                             <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Work mode</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(workModeOptions, profile.work_mode) || 'Not specified' }}</dd></div>
                             <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Availability</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(availabilityOptions, profile.availability) || 'Not specified' }}</dd></div>
+                            <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">New job notifications</dt><dd class="mt-1 font-medium text-slate-800">{{ profile.job_alerts_enabled ? 'On' : 'Off' }}</dd></div>
                             <div v-if="profile.expected_salary_min || profile.expected_salary_max"><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Expected monthly salary</dt><dd class="mt-1 font-medium text-slate-800">{{ profile.expected_salary_min ? Number(profile.expected_salary_min).toLocaleString() : 'Any' }} – {{ profile.expected_salary_max ? Number(profile.expected_salary_max).toLocaleString() : 'Any' }} MMK</dd></div>
                         </dl>
                     </section>
@@ -205,6 +206,17 @@ const availabilityOptions = [
                     </section>
                 </aside>
             </div>
+
+            <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="applications-title">
+                <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 id="applications-title" class="text-lg font-bold text-slate-950">My applications</h2><p class="mt-1 text-sm text-slate-600">Review the current status of applications you submitted.</p></div><a href="/jobs" class="text-sm font-semibold text-[var(--brand-primary)] hover:underline">Browse jobs</a></div>
+                <div v-if="profile.applications?.length" class="mt-5 divide-y divide-slate-100">
+                    <article v-for="application in profile.applications" :key="application.id" class="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                        <div class="min-w-0"><h3 class="truncate font-semibold text-slate-900">{{ application.job?.title || 'Job listing unavailable' }}</h3><p class="mt-1 text-sm text-slate-600">{{ application.job?.employer?.company_name || 'Employer' }}<span v-if="application.job?.location"> · {{ application.job.location }}</span></p><p class="mt-1 text-xs text-slate-500">Applied {{ application.submitted_at ? new Date(application.submitted_at).toLocaleDateString() : '—' }}</p></div>
+                        <span class="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold capitalize" :class="application.status === 'rejected' ? 'bg-red-50 text-red-800' : application.status === 'hired' || application.status === 'offered' ? 'bg-emerald-50 text-emerald-800' : 'bg-blue-50 text-blue-900'">{{ application.status?.replaceAll('_', ' ') }}</span>
+                    </article>
+                </div>
+                <p v-else class="mt-5 rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">You haven’t applied to any jobs yet.</p>
+            </section>
 
             <section id="profile-editor" class="mt-8 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="edit-profile-title">
                 <button type="button" class="flex w-full items-center justify-between text-left" :aria-expanded="editing" @click="editing = !editing">
@@ -244,6 +256,7 @@ const availabilityOptions = [
                     <div><label for="edit-salary-max" class="form-label">Maximum expected salary (MMK / month)</label><input id="edit-salary-max" name="expected_salary_max" v-model="draft.expected_salary_max" type="number" min="0" class="form-field"><p v-if="fieldError('expected_salary_max')" class="field-error">{{ fieldError('expected_salary_max') }}</p></div>
 
                     <div id="edit-preferences" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Job preferences</h3></div>
+                    <label class="sm:col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4"><input v-model="draft.job_alerts_enabled" name="job_alerts_enabled" type="checkbox" value="1" class="mt-0.5 h-4 w-4 rounded border-slate-300 accent-blue-700"><span><span class="block text-sm font-semibold text-slate-900">Notify me about new jobs</span><span class="mt-1 block text-xs leading-5 text-slate-600">Receive an in-platform notification when an employer publishes a new listing. You can turn this off at any time.</span></span></label>
                     <div id="edit-experience" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Work experience</h3></div>
                     <fieldset v-for="(item, index) in draft.experiences" :key="item.id ?? `new-experience-${index}`" class="grid gap-4 rounded-xl border border-slate-200 p-4 sm:col-span-2 sm:grid-cols-2">
                         <legend class="px-2 text-sm font-semibold text-slate-700">Position {{ index + 1 }}</legend>

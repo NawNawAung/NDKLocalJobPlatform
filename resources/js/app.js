@@ -27,7 +27,9 @@ const pages = {
 };
 
 const currentHash = ref(window.location.hash);
+const currentRouteHash = computed(() => currentHash.value.split('?')[0]);
 const authBootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
+window.axios.defaults.headers.common['X-CSRF-TOKEN'] = authBootstrap.csrfToken ?? '';
 window.addEventListener('hashchange', () => {
     currentHash.value = window.location.hash;
 });
@@ -41,10 +43,10 @@ createApp({
             if (authBootstrap.page === 'search' && !currentHash.value) return JobSearch;
             const employerPages = ['#post-job', '#pipeline', '#dashboard'];
             const jobSeekerPages = ['#skills-assessment'];
-            if (employerPages.includes(currentHash.value) && authBootstrap.role !== 'employer') return Home;
-            if (jobSeekerPages.includes(currentHash.value) && authBootstrap.role !== 'job_seeker') return Home;
-            if (currentHash.value === '#messages' && !authBootstrap.authenticated) return Home;
-            return pages[currentHash.value] ?? Home;
+            if (employerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'employer') return Home;
+            if (jobSeekerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'job_seeker') return Home;
+            if (currentRouteHash.value === '#messages' && !authBootstrap.authenticated) return Home;
+            return pages[currentRouteHash.value] ?? Home;
         });
 
         return () => h('div', { class: 'min-h-screen bg-slate-50 text-slate-900' }, [

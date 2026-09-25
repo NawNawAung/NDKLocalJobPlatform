@@ -89,6 +89,7 @@ class AuthController extends Controller
             'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'temporary', 'internship'])],
             'work_mode' => ['nullable', Rule::in(['on_site', 'hybrid', 'remote', 'any'])],
             'availability' => ['nullable', Rule::in(['immediately', 'two_weeks', 'one_month', 'not_looking'])],
+            'job_alerts_enabled' => ['nullable', 'boolean'],
             'expected_salary_min' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'expected_salary_max' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'skills_text' => ['nullable', 'string', 'max:2000'],
@@ -200,6 +201,7 @@ class AuthController extends Controller
             'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'temporary', 'internship'])],
             'work_mode' => ['nullable', Rule::in(['on_site', 'hybrid', 'remote', 'any'])],
             'availability' => ['nullable', Rule::in(['immediately', 'two_weeks', 'one_month', 'not_looking'])],
+            'job_alerts_enabled' => ['nullable', 'boolean'],
             'expected_salary_min' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'expected_salary_max' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'skills_text' => ['nullable', 'string', 'max:2000'],
@@ -243,6 +245,7 @@ class AuthController extends Controller
             'employment_type' => $attributes['employment_type'] ?? null,
             'work_mode' => $attributes['work_mode'] ?? null,
             'availability' => $attributes['availability'] ?? null,
+            'job_alerts_enabled' => (bool) ($attributes['job_alerts_enabled'] ?? false),
             'expected_salary_min' => $attributes['expected_salary_min'] ?? null,
             'expected_salary_max' => $attributes['expected_salary_max'] ?? null,
             'skills' => $this->parseTags($attributes['skills_text'] ?? ''),
@@ -288,6 +291,9 @@ class AuthController extends Controller
         if ($page === 'profile' && $user?->role === 'job_seeker') {
             $seeker = $user->jobSeeker()->with([
                 'region:id,name,type', 'township:id,name', 'experiences', 'educations',
+                'applications:id,job_id,job_seeker_id,status,submitted_at,created_at',
+                'applications.job:id,employer_id,title,location',
+                'applications.job.employer:id,company_name',
             ])->withCount(['applications', 'savedJobs'])->first();
             if ($seeker) {
                 $seekerProfile = [...$seeker->toArray(), 'user' => $user->only(['name', 'email'])];

@@ -74,6 +74,18 @@ function formatLabel(value) {
     return value.split('_').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+function applicationStatusLabel(status) {
+    if (!status) return '';
+    return status === 'submitted' ? 'Applied' : formatLabel(status);
+}
+
+function applicationStatusClass(status) {
+    if (status === 'rejected') return 'bg-red-50 text-red-800';
+    if (['offered', 'hired'].includes(status)) return 'bg-emerald-50 text-emerald-800';
+    if (status === 'withdrawn') return 'bg-slate-100 text-slate-700';
+    return 'bg-blue-50 text-blue-900';
+}
+
 function formatSalary(job) {
     if (job.salary_min == null && job.salary_max == null) return 'Salary not disclosed';
     const currency = job.salary_currency ?? 'MMK';
@@ -90,6 +102,10 @@ function postedLabel(value) {
     if (days < 7) return `${days} days ago`;
     if (days < 30) return `${Math.floor(days / 7)} week${days < 14 ? '' : 's'} ago`;
     return new Date(value).toLocaleDateString();
+}
+
+function openJob(job) {
+    window.location.hash = `details?job=${job.id}`;
 }
 
 onMounted(() => loadJobs(page.value));
@@ -197,7 +213,9 @@ onMounted(() => loadJobs(page.value));
                             <div class="mt-4 flex flex-wrap items-center gap-2">
                                 <span v-if="job.category" class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">{{ job.category }}</span>
                                 <span v-if="job.experience_level" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ formatLabel(job.experience_level) }} experience</span>
+                                <span v-if="job.application_status" class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span>
                                 <span class="ml-auto text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span>
+                                <button type="button" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openJob(job)">{{ job.application_status ? 'View application' : 'View and apply' }}</button>
                             </div>
                         </article>
                     </div>

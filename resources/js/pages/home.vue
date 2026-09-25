@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 const keyword = ref('');
 const regionId = ref('');
@@ -12,7 +12,9 @@ const salaryMin = ref('');
 const salaryMax = ref('');
 const datePosted = ref('');
 const advancedFiltersOpen = ref(false);
-const savedJobs = ref([]);
+const featuredJobs = ref([]);
+const featuredLoading = ref(true);
+const featuredError = ref('');
 const regions = window.__AUTH_BOOTSTRAP__?.regions ?? [];
 const townships = computed(() => regions.find((region) => String(region.id) === regionId.value)?.townships ?? []);
 
@@ -51,9 +53,43 @@ function searchByCategory(value) {
     category.value = value;
     submitSearch();
 }
-function toggleSavedJob(title) {
-    savedJobs.value = savedJobs.value.includes(title) ? savedJobs.value.filter((item) => item !== title) : [...savedJobs.value, title];
+function formatLabel(value) {
+    return value ? value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) : '';
 }
+
+function formatSalary(job) {
+    if (job.salary_min == null && job.salary_max == null) return 'Salary not disclosed';
+    const amount = (value) => new Intl.NumberFormat('en-US').format(value);
+    if (job.salary_min != null && job.salary_max != null) return `${amount(job.salary_min)} – ${amount(job.salary_max)} ${job.salary_currency ?? 'MMK'}`;
+    return job.salary_min != null ? `From ${amount(job.salary_min)} ${job.salary_currency ?? 'MMK'}` : `Up to ${amount(job.salary_max)} ${job.salary_currency ?? 'MMK'}`;
+}
+
+function postedLabel(value) {
+    if (!value) return 'Recently posted';
+    const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
+    return days === 0 ? 'Today' : days === 1 ? '1 day ago' : days < 7 ? `${days} days ago` : `${Math.floor(days / 7)} weeks ago`;
+}
+
+function applicationStatusLabel(status) {
+    if (!status) return '';
+    return status === 'submitted' ? 'Applied' : formatLabel(status);
+}
+
+function applicationStatusClass(status) {
+    if (status === 'rejected') return 'bg-red-50 text-red-800';
+    if (['offered', 'hired'].includes(status)) return 'bg-emerald-50 text-emerald-800';
+    if (status === 'withdrawn') return 'bg-slate-100 text-slate-700';
+    return 'bg-blue-50 text-blue-900';
+}
+
+onMounted(async () => {
+    try {
+        const { data } = await window.axios.get('/api/jobs/search');
+        featuredJobs.value = (data.data ?? []).slice(0, 3);
+    } catch {
+        featuredError.value = 'Featured jobs are unavailable right now.';
+    } finally { featuredLoading.value = false; }
+});
 </script>
 
 <template>
@@ -220,71 +256,19 @@ function toggleSavedJob(title) {
               <i class="ti ti-arrow-right text-base text-blue-500" />
             </a>
           </div>
-          <div class="flex flex-col gap-4">
-            <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/kbzLogo.png'" alt="KBZ Group logo" />
-              <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap gap-2.5 items-center mb-1">
-                  <span class="text-base font-semibold leading-6 text-gray-900">Senior Developer</span>
-                  <span class="px-2 py-0.5 text-xs font-medium text-blue-500 bg-blue-100 rounded">Full-time</span>
-                </div>
-                <div class="flex flex-wrap gap-2 items-center">
-                  <span class="text-sm font-medium text-blue-500">KBZ Group</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">Yangon</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">1,500,000 - 1,800,000 MMK</span>
-                </div>
+          <p v-if="featuredError" class="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ featuredError }} <a href="/jobs" class="font-semibold underline">Browse all jobs</a></p>
+          <div v-else-if="featuredLoading" class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">Loading current openings…</div>
+          <div v-else-if="featuredJobs.length" class="flex flex-col gap-4">
+            <article v-for="job in featuredJobs" :key="job.id" class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-blue-200 hover:shadow-sm">
+              <div class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-blue-50 text-lg font-bold text-blue-900">{{ job.company?.slice(0, 2)?.toUpperCase() || 'CO' }}</div>
+              <div class="min-w-0 flex-1">
+                <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
+                <div class="flex flex-wrap items-center gap-2 text-sm"><span class="font-medium text-blue-800">{{ job.company }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ job.location }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ formatSalary(job) }}</span></div>
               </div>
-              <div class="flex gap-3 items-center flex-[shrink] max-sm:justify-between max-sm:w-full">
-                <span class="text-sm text-gray-400">2 days ago</span>
-                <button type="button" class="flex justify-center items-center w-9 h-9 rounded-lg border border border-solid" :aria-pressed="savedJobs.includes('Senior Developer')" aria-label="Save Senior Developer" @click="toggleSavedJob('Senior Developer')"><i class="ti ti-bookmark text-base" :class="savedJobs.includes('Senior Developer') ? 'text-blue-600' : 'text-gray-500'" /></button>
-                <a href="#details" class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg">Apply Now</a>
-              </div>
-            </div>
-            <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/grabLogo.webp'" alt="Grab Myanmar logo" />
-              <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap gap-2.5 items-center mb-1">
-                  <span class="text-base font-semibold leading-6 text-gray-900">Operations Executive</span>
-                  <span class="px-2 py-0.5 text-xs font-medium text-blue-500 bg-blue-100 rounded">Full-time</span>
-                </div>
-                <div class="flex flex-wrap gap-2 items-center">
-                  <span class="text-sm font-medium text-blue-500">Grab Myanmar</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">Mandalay</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">800,000 - 1,200,000 MMK</span>
-                </div>
-              </div>
-              <div class="flex gap-3 items-center flex-[shrink] max-sm:justify-between max-sm:w-full">
-                <span class="text-sm text-gray-400">1 week ago</span>
-                <button type="button" class="flex justify-center items-center w-9 h-9 rounded-lg border border border-solid" :aria-pressed="savedJobs.includes('Operations Executive')" aria-label="Save Operations Executive" @click="toggleSavedJob('Operations Executive')"><i class="ti ti-bookmark text-base" :class="savedJobs.includes('Operations Executive') ? 'text-blue-600' : 'text-gray-500'" /></button>
-                <a href="#details" class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg">Apply Now</a>
-              </div>
-            </div>
-            <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/waveLogo.jpg'" alt="Wave Money logo" />
-              <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap gap-2.5 items-center mb-1">
-                  <span class="text-base font-semibold leading-6 text-gray-900">Customer Support Officer</span>
-                  <span class="px-2 py-0.5 text-xs font-medium text-gray-700 bg-gray-100 rounded">Contract</span>
-                </div>
-                <div class="flex flex-wrap gap-2 items-center">
-                  <span class="text-sm font-medium text-blue-500">Wave Money</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">Yangon</span>
-                  <span class="text-sm text-gray-400">·</span>
-                  <span class="text-sm text-gray-500">450,000 - 600,000 MMK</span>
-                </div>
-              </div>
-              <div class="flex gap-3 items-center flex-[shrink] max-sm:justify-between max-sm:w-full">
-                <span class="text-sm text-gray-400">Just now</span>
-                <button type="button" class="flex justify-center items-center w-9 h-9 rounded-lg border border border-solid" :aria-pressed="savedJobs.includes('Customer Support Officer')" aria-label="Save Customer Support Officer" @click="toggleSavedJob('Customer Support Officer')"><i class="ti ti-bookmark text-base" :class="savedJobs.includes('Customer Support Officer') ? 'text-blue-600' : 'text-gray-500'" /></button>
-                <a href="#details" class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg">Apply Now</a>
-              </div>
-            </div>
+              <div class="flex shrink-0 items-center gap-3"><span class="text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span><a :href="`/#details?job=${job.id}`" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ job.application_status ? 'View application' : 'View and apply' }}</a></div>
+            </article>
           </div>
+          <div v-else class="rounded-xl border border-dashed border-slate-300 p-8 text-center"><p class="text-sm text-slate-600">There are no published jobs yet.</p><a href="/jobs" class="mt-3 inline-flex font-semibold text-[var(--brand-primary)] hover:underline">Browse jobs</a></div>
         </div>
         <div class="px-20 py-10 bg-cyan-900 max-sm:px-4 max-sm:py-8">
           <div class="flex justify-between items-center max-sm:flex-col max-sm:gap-6 max-sm:items-start">

@@ -28,8 +28,10 @@ class ConversationController extends Controller
             ->whereHas('participants', fn ($query) => $query->whereKey($user->id))
             ->with([
                 'participants:id,name,role',
+                'participants.employer:id,user_id,company_name',
                 'application.job:id,title',
-                'latestMessage.sender:id,name',
+                'latestMessage.sender:id,name,role',
+                'latestMessage.sender.employer:id,user_id,company_name',
                 'latestMessage.attachments',
                 'latestMessage.reads',
             ])
@@ -37,7 +39,9 @@ class ConversationController extends Controller
                 ->where('sender_id', '!=', $user->id)
                 ->whereDoesntHave('reads', fn ($reads) => $reads->where('user_id', $user->id)->whereNotNull('read_at'))])
             ->when($search !== '', fn ($query) => $query->where(function ($conversations) use ($search) {
-                $conversations->whereHas('participants', fn ($participants) => $participants->where('users.name', 'like', "%{$search}%"))
+                $conversations->whereHas('participants', fn ($participants) => $participants
+                    ->where('users.name', 'like', "%{$search}%")
+                    ->orWhereHas('employer', fn ($employers) => $employers->where('company_name', 'like', "%{$search}%")))
                     ->orWhereHas('application.job', fn ($jobs) => $jobs->where('title', 'like', "%{$search}%"));
             }))
             ->orderByDesc('updated_at')
@@ -68,7 +72,13 @@ class ConversationController extends Controller
         });
 
         return response()->json(['conversation' => $this->conversationData(
-            $conversation->load(['participants:id,name,role', 'application.job:id,title', 'latestMessage.sender:id,name']),
+            $conversation->load([
+                'participants:id,name,role',
+                'participants.employer:id,user_id,company_name',
+                'application.job:id,title',
+                'latestMessage.sender:id,name,role',
+                'latestMessage.sender.employer:id,user_id,company_name',
+            ]),
             $request->user(),
         )], 201);
     }
@@ -78,7 +88,7 @@ class ConversationController extends Controller
         $this->authorize('view', $conversation);
         $user = $request->user();
         $messages = $conversation->messages()
-            ->with(['sender:id,name', 'attachments', 'reads'])
+            ->with(['sender:id,name,role', 'sender.employer:id,user_id,company_name', 'attachments', 'reads'])
             ->orderByDesc('id')
             ->limit(50)
             ->get()
@@ -130,8 +140,10 @@ class ConversationController extends Controller
                     ->each(fn (User $recipient) => MessageRead::create(['message_id' => $message->id, 'user_id' => $recipient->id]));
 
                 $conversation->touch();
+                $sender = $request->user()->loadMissing('employer');
+                $senderName = $sender->role === 'employer' ? ($sender->employer?->company_name ?: 'Employer') : $sender->name;
                 foreach ($conversation->participants()->whereKeyNot($request->user()->id)->get() as $recipient) {
-                    Notification::sendNotification($recipient, 'New message', "{$request->user()->name} sent you a message.", $conversation->id);
+                    Notification::sendNotification($recipient, 'New message', "{$senderName} sent you a message.", $conversation->id, 'message', '/#messages');
                 }
 
                 return $message->load(['sender:id,name', 'attachments', 'reads']);
@@ -174,6 +186,7 @@ class ConversationController extends Controller
     {
         $latest = $conversation->latestMessage;
         $job = $conversation->application?->job;
+        $otherParticipant = $conversation->participants->firstWhere('id', '!=', $viewer->id);
 
         return [
             'id' => $conversation->id,
@@ -181,13 +194,13 @@ class ConversationController extends Controller
             'job_title' => $job?->title,
             'participants' => $conversation->participants->map(fn (User $participant) => [
                 'id' => $participant->id,
-                'name' => $participant->name,
+                'name' => $this->displayName($participant),
                 'role' => $participant->role,
             ])->values(),
-            'other_participant' => $conversation->participants->firstWhere('id', '!=', $viewer->id) ? [
-                'id' => $conversation->participants->firstWhere('id', '!=', $viewer->id)->id,
-                'name' => $conversation->participants->firstWhere('id', '!=', $viewer->id)->name,
-                'role' => $conversation->participants->firstWhere('id', '!=', $viewer->id)->role,
+            'other_participant' => $otherParticipant ? [
+                'id' => $otherParticipant->id,
+                'name' => $this->displayName($otherParticipant),
+                'role' => $otherParticipant->role,
             ] : null,
             'unread_count' => (int) ($conversation->unread_count ?? 0),
             'updated_at' => $conversation->updated_at?->toIso8601String(),
@@ -201,7 +214,7 @@ class ConversationController extends Controller
             'id' => $message->id,
             'conversation_id' => $message->conversation_id,
             'sender_id' => $message->sender_id,
-            'sender_name' => $message->sender?->name,
+            'sender_name' => $message->sender ? $this->displayName($message->sender) : null,
             'body' => $message->body,
             'created_at' => $message->created_at?->toIso8601String(),
             'is_mine' => $message->sender_id === $viewer->id,
@@ -213,5 +226,12 @@ class ConversationController extends Controller
                 'download_url' => route('message-attachments.show', $attachment),
             ])->values(),
         ];
+    }
+
+    private function displayName(User $user): string
+    {
+        return $user->role === 'employer'
+            ? ($user->employer?->company_name ?: 'Employer')
+            : $user->name;
     }
 }
