@@ -15,10 +15,11 @@ class Job extends Model
     protected $table = 'job_listings';
 
     public const STATUSES = ['draft', 'published', 'paused', 'closed'];
-    protected $fillable = ['employer_id', 'title', 'description', 'requirements', 'location', 'category', 'employment_type', 'salary_min', 'salary_max', 'salary_currency', 'status', 'posted_at', 'application_deadline'];
+    protected $fillable = ['employer_id', 'township_id', 'title', 'description', 'requirements', 'location', 'category', 'employment_type', 'experience_level', 'work_mode', 'salary_min', 'salary_max', 'salary_currency', 'status', 'posted_at', 'application_deadline'];
     protected function casts(): array { return ['posted_at' => 'datetime', 'application_deadline' => 'datetime']; }
 
     public function employer(): BelongsTo { return $this->belongsTo(Employer::class); }
+    public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function applications(): HasMany { return $this->hasMany(Application::class); }
     public function savedBy(): HasMany { return $this->hasMany(SavedJob::class); }
 

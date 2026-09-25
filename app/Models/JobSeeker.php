@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JobSeeker extends Model
 {
-    protected $fillable = ['user_id', 'cv_path', 'skills', 'languages', 'status', 'bio'];
+    protected $fillable = ['user_id', 'region_id', 'township_id', 'cv_path', 'skills', 'languages', 'status', 'bio'];
     protected function casts(): array { return ['skills' => 'array', 'languages' => 'array', 'status' => 'boolean']; }
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function region(): BelongsTo { return $this->belongsTo(Region::class); }
+    public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function applications(): HasMany { return $this->hasMany(Application::class); }
     public function savedJobs(): HasMany { return $this->hasMany(SavedJob::class); }
 
@@ -20,6 +22,7 @@ class JobSeeker extends Model
     {
         return Job::published()
             ->when($filters['keyword'] ?? null, fn (Builder $query, string $keyword) => $query->where(fn (Builder $q) => $q->where('title', 'like', "%{$keyword}%")->orWhere('description', 'like', "%{$keyword}%")))
+            ->when($filters['township_id'] ?? null, fn (Builder $query, int $townshipId) => $query->where('township_id', $townshipId))
             ->when($filters['location'] ?? null, fn (Builder $query, string $location) => $query->where('location', 'like', "%{$location}%"))
             ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where('category', $category));
     }

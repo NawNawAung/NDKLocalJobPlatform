@@ -12,5 +12,15 @@
     </head>
     <body>
         <div id="app"></div>
+        <script>
+            window.__AUTH_BOOTSTRAP__ = {{ Illuminate\Support\Js::from($authBootstrap ?? [
+                'authPage' => null,
+                'authenticated' => auth()->check(),
+                'csrfToken' => csrf_token(),
+                'errors' => [],
+                'old' => [],
+                'regions' => [],
+            ]) }};
+        </script>
     </body>
 </html>

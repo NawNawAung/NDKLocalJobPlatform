@@ -58,7 +58,7 @@ function closeJob(job) {
           <div class="flex justify-between items-center mb-6">
             <div class="flex gap-3 items-center">
               <div class="flex overflow-hidden justify-center items-center w-12 h-12 bg-gray-200 rounded-xl">
-                <img class="w-full h-full object-cover" :src="'/images/companies/kbz-group.svg'" alt="KBZ Group logo" />
+                <img class="w-full h-full object-cover" :src="'/images/companies/kbzLogo.png'" alt="KBZ Group logo" />
               </div>
               <div>
                 <div class="flex gap-1.5 items-center">
