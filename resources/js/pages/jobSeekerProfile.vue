@@ -1,251 +1,298 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 
-const mobileMenuOpen = ref(false);
-const profileNotice = ref('');
+const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
+const source = bootstrap.profile ?? {};
+const old = bootstrap.old ?? {};
+const hasErrors = Object.keys(bootstrap.errors ?? {}).length > 0;
+const profile = reactive({
+    ...source,
+    user: { name: '', email: '', ...(source.user ?? {}) },
+    region: source.region ?? null,
+    township: source.township ?? null,
+    experiences: (source.experiences ?? []).map((item) => ({ ...item, started_on: item.started_on?.slice(0, 10) ?? '', ended_on: item.ended_on?.slice(0, 10) ?? '' })),
+    educations: [...(source.educations ?? [])],
+});
+const draft = reactive({
+    ...source,
+    ...old,
+    user: { name: old.name ?? profile.user.name, email: old.email ?? profile.user.email },
+    experiences: (old.experiences ?? profile.experiences).map((item) => ({ ...item })),
+    educations: (old.educations ?? profile.educations).map((item) => ({ ...item })),
+});
+const editing = ref(hasErrors);
+const regionId = ref(String(old.region_id ?? profile.region_id ?? ''));
+const townshipId = ref(String(old.township_id ?? profile.township_id ?? ''));
+const skillsText = ref(old.skills_text ?? (profile.skills ?? []).join(', '));
+const languagesText = ref(old.languages_text ?? (profile.languages ?? []).join(', '));
+const regions = computed(() => bootstrap.regions ?? []);
+const townships = computed(() => regions.value.find((item) => String(item.id) === regionId.value)?.townships ?? []);
+const errors = bootstrap.errors ?? {};
+const notice = bootstrap.status ?? '';
 
-function announce(message) {
-    profileNotice.value = message;
+watch(regionId, () => { townshipId.value = ''; });
+
+const initials = computed(() => profile.user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
+const completenessItems = computed(() => [
+    { label: 'Name and email', done: Boolean(profile.user.name && profile.user.email), points: 8 },
+    { label: 'Phone number', done: Boolean(profile.phone), points: 4 },
+    { label: 'Region or state', done: Boolean(profile.region_id), points: 8 },
+    { label: 'Professional headline', done: Boolean(profile.professional_title), points: 8 },
+    { label: 'Professional summary', done: Boolean(profile.bio?.trim()), points: 8 },
+    { label: 'Skills', done: Boolean(profile.skills?.length), points: 10 },
+    { label: 'Languages', done: Boolean(profile.languages?.length), points: 4 },
+    { label: 'Experience level', done: profile.years_experience !== null && profile.years_experience !== undefined, points: 4 },
+    { label: 'Desired role', done: Boolean(profile.desired_job_title), points: 3 },
+    { label: 'Employment type', done: Boolean(profile.employment_type), points: 2 },
+    { label: 'Work mode', done: Boolean(profile.work_mode), points: 2 },
+    { label: 'Availability', done: Boolean(profile.availability), points: 3 },
+    { label: 'Resume / CV', done: Boolean(profile.cv_path), points: 10 },
+    { label: 'Work experience', done: Boolean(profile.experiences?.length), points: 15 },
+    { label: 'Education', done: Boolean(profile.educations?.length), points: 11 },
+]);
+const completeness = computed(() => completenessItems.value.reduce((sum, item) => sum + (item.done ? item.points : 0), 0));
+const incompleteItems = computed(() => completenessItems.value.filter((item) => !item.done));
+
+function fieldError(field) { return errors[field]?.[0] ?? ''; }
+function nestedError(section, index, field) { return errors[`${section}.${index}.${field}`]?.[0] ?? ''; }
+function labelFor(options, value) { return options.find((item) => item.value === value)?.label ?? ''; }
+function formatDate(value) {
+    if (!value) return '';
+    return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(new Date(`${value.slice(0, 10)}T00:00:00`));
 }
+function addExperience() {
+    draft.experiences.push({ job_title: '', employer_name: '', location: '', started_on: '', ended_on: '', is_current: false, description: '' });
+}
+function addEducation() {
+    draft.educations.push({ institution: '', qualification: '', field_of_study: '', started_year: '', graduated_year: '', description: '' });
+}
+function openEditor() {
+    Object.assign(draft, {
+        ...source,
+        user: { name: profile.user.name, email: profile.user.email },
+        experiences: profile.experiences.map((item) => ({ ...item })),
+        educations: profile.educations.map((item) => ({ ...item })),
+    });
+    regionId.value = String(profile.region_id ?? '');
+    townshipId.value = String(profile.township_id ?? '');
+    skillsText.value = (profile.skills ?? []).join(', ');
+    languagesText.value = (profile.languages ?? []).join(', ');
+    editing.value = true;
+    nextTick(() => document.getElementById('profile-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+const employmentOptions = [
+    { value: 'full_time', label: 'Full time' }, { value: 'part_time', label: 'Part time' },
+    { value: 'contract', label: 'Contract' }, { value: 'temporary', label: 'Temporary' }, { value: 'internship', label: 'Internship' },
+];
+const workModeOptions = [
+    { value: 'on_site', label: 'On site' }, { value: 'hybrid', label: 'Hybrid' }, { value: 'remote', label: 'Remote' }, { value: 'any', label: 'Any' },
+];
+const availabilityOptions = [
+    { value: 'immediately', label: 'Immediately' }, { value: 'two_weeks', label: 'Within two weeks' },
+    { value: 'one_month', label: 'Within one month' }, { value: 'not_looking', label: 'Not currently looking' },
+];
 </script>
 
 <template>
-      <div class="flex flex-col bg-gray-100 min-h-screen">
-        <header class="sticky top-0 z-50 bg-white border-b">
-          <nav class="flex justify-between items-center px-6 h-14" aria-label="Main navigation">
-          <div class="flex gap-2 items-center">
-            <div class="flex gap-1.5 items-center">
-              <div class="text-lg font-bold tracking-normal leading-6 text-cyan-900">NDK</div>
-              <div class="px-1.5 py-0.5 text-xs font-semibold leading-4 text-white bg-cyan-900 rounded">MYANMAR</div>
+    <section v-if="profile.user.name" class="min-h-[60vh] bg-slate-50 px-5 py-8 sm:px-8 sm:py-12">
+        <div class="mx-auto max-w-6xl">
+            <div v-if="notice" class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-5">
+                        <div class="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-100 text-xl font-bold text-blue-800 ring-4 ring-blue-50 sm:h-24 sm:w-24">
+                            <img v-if="profile.profile_photo_url" :src="profile.profile_photo_url" :alt="`${profile.user.name} profile photo`" class="h-full w-full object-cover">
+                            <span v-else aria-label="Profile photo not uploaded">{{ initials }}</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Job seeker profile</p>
+                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">{{ profile.user.name }}</h1>
+                            <p class="mt-1 text-base font-medium text-blue-800">{{ profile.professional_title || 'Add a professional headline' }}</p>
+                            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                                <span><i class="ti ti-mail mr-1" aria-hidden="true" />{{ profile.user.email }}</span>
+                                <span v-if="profile.phone"><i class="ti ti-phone mr-1" aria-hidden="true" />{{ profile.phone }}</span>
+                                <span v-if="profile.region"><i class="ti ti-map-pin mr-1" aria-hidden="true" />{{ profile.township ? `${profile.township.name}, ` : '' }}{{ profile.region.name }}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" class="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] sm:self-center" @click="openEditor">
+                        <i class="ti ti-edit" aria-hidden="true" /> Edit profile
+                    </button>
+                </div>
+                <div class="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-3">
+                    <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-medium uppercase tracking-wide text-slate-500">Applications</p><p class="mt-1 text-xl font-bold text-slate-900">{{ profile.applications_count ?? 0 }}</p></div>
+                    <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-medium uppercase tracking-wide text-slate-500">Saved jobs</p><p class="mt-1 text-xl font-bold text-slate-900">{{ profile.saved_jobs_count ?? 0 }}</p></div>
+                    <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-medium uppercase tracking-wide text-slate-500">Experience</p><p class="mt-1 text-xl font-bold text-slate-900">{{ profile.years_experience ?? '—' }}<span v-if="profile.years_experience !== null && profile.years_experience !== undefined" class="ml-1 text-sm font-medium">years</span></p></div>
+                </div>
             </div>
-          </div>
-          <div class="flex gap-8 items-center max-sm:hidden">
-            <a href="#search" class="pb-0.5 text-sm font-semibold leading-5 text-cyan-900 border-b-2 border-cyan-900">Jobs</a>
-            <a href="#companies" class="text-sm leading-5 text-gray-500">Companies</a>
-            <a href="#pipeline" class="text-sm leading-5 text-gray-500">Dashboard</a>
-          </div>
-          <div class="flex gap-3 items-center">
-            <div class="max-sm:hidden">
-              <i class="ti ti-search text-xl text-gray-500 cursor-pointer" />
+
+            <div class="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div class="space-y-6">
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="about-title">
+                        <h2 id="about-title" class="text-lg font-bold text-slate-950">Professional summary</h2>
+                        <p v-if="profile.bio" class="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700">{{ profile.bio }}</p>
+                        <p v-else class="mt-3 text-sm text-slate-500">No professional summary added yet.</p>
+                    </section>
+
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="experience-title">
+                        <div class="flex items-center justify-between gap-4">
+                            <div><h2 id="experience-title" class="text-lg font-bold text-slate-950">Work experience</h2><p class="mt-1 text-sm text-slate-500">Your employment history and achievements.</p></div>
+                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ profile.experiences.length }}</span>
+                        </div>
+                        <div v-if="profile.experiences.length" class="mt-6 divide-y divide-slate-100">
+                            <article v-for="item in profile.experiences" :key="item.id ?? `${item.job_title}-${item.employer_name}`" class="py-5 first:pt-0 last:pb-0">
+                                <h3 class="font-semibold text-slate-900">{{ item.job_title }}</h3>
+                                <p class="mt-1 text-sm font-medium text-blue-800">{{ item.employer_name }}<span v-if="item.location" class="font-normal text-slate-500"> · {{ item.location }}</span></p>
+                                <p class="mt-1 text-xs text-slate-500">{{ formatDate(item.started_on) }}<span v-if="item.started_on"> – </span>{{ item.is_current ? 'Present' : formatDate(item.ended_on) }}</p>
+                                <p v-if="item.description" class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{{ item.description }}</p>
+                            </article>
+                        </div>
+                        <p v-else class="mt-5 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-600">Add your work history to show employers where you have built experience.</p>
+                    </section>
+
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="education-title">
+                        <div class="flex items-center justify-between gap-4"><div><h2 id="education-title" class="text-lg font-bold text-slate-950">Education</h2><p class="mt-1 text-sm text-slate-500">Your education and qualifications.</p></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ profile.educations.length }}</span></div>
+                        <div v-if="profile.educations.length" class="mt-6 divide-y divide-slate-100">
+                            <article v-for="item in profile.educations" :key="item.id ?? `${item.institution}-${item.qualification}`" class="py-5 first:pt-0 last:pb-0">
+                                <h3 class="font-semibold text-slate-900">{{ item.qualification || item.institution }}</h3>
+                                <p class="mt-1 text-sm text-blue-800">{{ item.institution }}<span v-if="item.field_of_study"> · {{ item.field_of_study }}</span></p>
+                                <p v-if="item.started_year || item.graduated_year" class="mt-1 text-xs text-slate-500">{{ item.started_year || '' }}<span v-if="item.started_year && item.graduated_year"> – </span>{{ item.graduated_year || '' }}</p>
+                                <p v-if="item.description" class="mt-2 text-sm leading-6 text-slate-700">{{ item.description }}</p>
+                            </article>
+                        </div>
+                        <p v-else class="mt-5 rounded-lg bg-slate-50 px-4 py-5 text-sm text-slate-600">Add your education or professional qualifications.</p>
+                    </section>
+
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="skills-title">
+                        <h2 id="skills-title" class="text-lg font-bold text-slate-950">Skills and languages</h2>
+                        <div class="mt-5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Skills</h3>
+                            <div v-if="profile.skills?.length" class="mt-2 flex flex-wrap gap-2"><span v-for="skill in profile.skills" :key="skill" class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-900">{{ skill }}</span></div>
+                            <p v-else class="mt-2 text-sm text-slate-500">No skills added yet.</p>
+                        </div>
+                        <div class="mt-5">
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Languages</h3>
+                            <div v-if="profile.languages?.length" class="mt-2 flex flex-wrap gap-2"><span v-for="language in profile.languages" :key="language" class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700">{{ language }}</span></div>
+                            <p v-else class="mt-2 text-sm text-slate-500">No languages added yet.</p>
+                        </div>
+                    </section>
+                </div>
+
+                <aside class="space-y-6">
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="completeness-title">
+                        <div class="flex items-center justify-between gap-3"><h2 id="completeness-title" class="font-bold text-slate-950">Profile completeness</h2><span class="text-lg font-bold text-blue-800">{{ completeness }}%</span></div>
+                        <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" :aria-valuenow="completeness" aria-valuemin="0" aria-valuemax="100" :aria-label="`Profile ${completeness}% complete`"><div class="h-full rounded-full bg-blue-700 transition-all" :style="{ width: `${completeness}%` }" /></div>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ completeness === 100 ? 'Your profile has all recommended sections.' : 'Complete more sections to give employers a clearer view of your experience.' }}</p>
+                        <ul v-if="incompleteItems.length" class="mt-4 space-y-2 border-t border-slate-100 pt-4">
+                            <li v-for="item in incompleteItems" :key="item.label" class="flex items-start gap-2 text-sm text-slate-600"><i class="ti ti-circle-dashed mt-0.5 text-blue-600" aria-hidden="true" /><span>{{ item.label }}</span></li>
+                        </ul>
+                    </section>
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="preferences-title">
+                        <h2 id="preferences-title" class="font-bold text-slate-950">Job preferences</h2>
+                        <dl class="mt-4 space-y-3 text-sm">
+                            <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Desired role</dt><dd class="mt-1 font-medium text-slate-800">{{ profile.desired_job_title || 'Not specified' }}</dd></div>
+                            <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Employment type</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(employmentOptions, profile.employment_type) || 'Not specified' }}</dd></div>
+                            <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Work mode</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(workModeOptions, profile.work_mode) || 'Not specified' }}</dd></div>
+                            <div><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Availability</dt><dd class="mt-1 font-medium text-slate-800">{{ labelFor(availabilityOptions, profile.availability) || 'Not specified' }}</dd></div>
+                            <div v-if="profile.expected_salary_min || profile.expected_salary_max"><dt class="text-xs font-medium uppercase tracking-wide text-slate-500">Expected monthly salary</dt><dd class="mt-1 font-medium text-slate-800">{{ profile.expected_salary_min ? Number(profile.expected_salary_min).toLocaleString() : 'Any' }} – {{ profile.expected_salary_max ? Number(profile.expected_salary_max).toLocaleString() : 'Any' }} MMK</dd></div>
+                        </dl>
+                    </section>
+                    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="resume-title">
+                        <h2 id="resume-title" class="font-bold text-slate-950">Resume / CV</h2>
+                        <a v-if="profile.cv_path" href="/profile/resume" class="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50"><i class="ti ti-file-download" aria-hidden="true" />Download my resume</a>
+                        <p v-else class="mt-2 text-sm text-slate-600">You haven’t uploaded a resume yet.</p>
+                    </section>
+                </aside>
             </div>
-            <div class="flex gap-1.5 items-center px-3 py-1.5 bg-gray-100 rounded-3xl cursor-pointer max-sm:hidden">
-              <div class="w-2 h-2 bg-emerald-500 rounded-full" />
-              <div class="text-sm font-medium leading-5 text-gray-700">Recruiter Mode</div>
-            </div>
-            <div class="text-sm leading-5 text-gray-500 cursor-pointer max-sm:hidden">Sign Out</div>
-            <a href="#post-job" class="px-4 py-2 text-sm font-semibold leading-5 text-white bg-cyan-900 rounded-md max-sm:hidden">Post a Job</a>
-            <button type="button" class="hidden items-center max-sm:flex" :aria-expanded="mobileMenuOpen" aria-label="Toggle navigation menu" @click="mobileMenuOpen = !mobileMenuOpen"><i class="ti ti-menu-2 text-2xl text-gray-700" /></button>
-          </div>
-          </nav>
-          <div v-if="mobileMenuOpen" class="hidden max-sm:flex flex-col gap-3 border-t px-6 py-4 text-sm">
-            <a href="#search" @click="mobileMenuOpen = false">Jobs</a><a href="#companies" @click="mobileMenuOpen = false">Companies</a><a href="#pipeline" @click="mobileMenuOpen = false">Dashboard</a><a href="#post-job" @click="mobileMenuOpen = false">Post a Job</a>
-          </div>
-        </header>
-        <div class="overflow-hidden relative w-full h-[180px]">
-          <img class="w-full h-full object-cover" :src="'/images/profile-cover.svg'" alt="" />
-          <div class="absolute inset-0">
-            <svg class="absolute inset-0 w-full h-full" viewBox="0 0 1440 180" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="glow1" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00aaff" stop-opacity="0.3"></stop><stop offset="100%" stop-color="#00aaff" stop-opacity="0"></stop></radialGradient><radialGradient id="glow2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00ccff" stop-opacity="0.5"></stop><stop offset="100%" stop-color="#00ccff" stop-opacity="0"></stop></radialGradient></defs><ellipse cx="720" cy="90" rx="400" ry="80" fill="url(#glow1)"></ellipse><circle cx="720" cy="90" r="60" fill="url(#glow2)"></circle><line x1="100" y1="30" x2="300" y2="80" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="300" y1="80" x2="500" y2="40" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="500" y1="40" x2="700" y2="90" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="700" y1="90" x2="900" y2="50" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="900" y1="50" x2="1100" y2="100" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="1100" y1="100" x2="1300" y2="60" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.4"></line><line x1="200" y1="150" x2="400" y2="100" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.3"></line><line x1="400" y1="100" x2="600" y2="140" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.3"></line><line x1="600" y1="140" x2="800" y2="80" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.3"></line><line x1="800" y1="80" x2="1000" y2="130" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.3"></line><line x1="1000" y1="130" x2="1200" y2="70" stroke="#00aaff" stroke-width="0.5" stroke-opacity="0.3"></line><circle cx="100" cy="30" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="300" cy="80" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="500" cy="40" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="700" cy="90" r="3" fill="#00eeff" fill-opacity="0.9"></circle><circle cx="900" cy="50" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="1100" cy="100" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="1300" cy="60" r="2" fill="#00ccff" fill-opacity="0.7"></circle><circle cx="200" cy="150" r="2" fill="#00ccff" fill-opacity="0.5"></circle><circle cx="400" cy="100" r="2" fill="#00ccff" fill-opacity="0.5"></circle><circle cx="600" cy="140" r="2" fill="#00ccff" fill-opacity="0.5"></circle><circle cx="800" cy="80" r="2" fill="#00ccff" fill-opacity="0.5"></circle><circle cx="1000" cy="130" r="2" fill="#00ccff" fill-opacity="0.5"></circle><circle cx="1200" cy="70" r="2" fill="#00ccff" fill-opacity="0.5"></circle><line x1="300" y1="80" x2="400" y2="100" stroke="#00aaff" stroke-width="0.4" stroke-opacity="0.3"></line><line x1="500" y1="40" x2="600" y2="140" stroke="#00aaff" stroke-width="0.4" stroke-opacity="0.3"></line><line x1="700" y1="90" x2="800" y2="80" stroke="#00aaff" stroke-width="0.4" stroke-opacity="0.3"></line><line x1="900" y1="50" x2="1000" y2="130" stroke="#00aaff" stroke-width="0.4" stroke-opacity="0.3"></line><line x1="1100" y1="100" x2="1200" y2="70" stroke="#00aaff" stroke-width="0.4" stroke-opacity="0.3"></line><circle cx="720" cy="90" r="4" fill="#00eeff" fill-opacity="1"></circle><circle cx="720" cy="90" r="8" fill="#00eeff" fill-opacity="0.3"></circle><circle cx="720" cy="90" r="14" fill="#00eeff" fill-opacity="0.1"></circle></svg>
-          </div>
+
+            <section id="profile-editor" class="mt-8 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="edit-profile-title">
+                <button type="button" class="flex w-full items-center justify-between text-left" :aria-expanded="editing" @click="editing = !editing">
+                    <span><span id="edit-profile-title" class="block text-lg font-bold text-slate-950">Edit your information</span><span class="mt-1 block text-sm text-slate-600">Update your contact details, career history, and preferences.</span></span>
+                    <i :class="editing ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" class="text-xl text-slate-500" aria-hidden="true" />
+                </button>
+                <div v-if="editing" class="mt-6 grid gap-6 border-t border-slate-100 pt-6 lg:grid-cols-[190px_minmax(0,1fr)] lg:items-start">
+                    <nav class="flex gap-2 overflow-x-auto pb-2 text-sm lg:sticky lg:top-24 lg:flex-col lg:overflow-visible lg:pb-0" aria-label="Profile edit sections">
+                        <a href="#edit-contact" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Contact & location</a>
+                        <a href="#edit-summary" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Professional summary</a>
+                        <a href="#edit-skills-section" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Skills & languages</a>
+                        <a href="#edit-preferences" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Job preferences</a>
+                        <a href="#edit-experience" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Work experience</a>
+                        <a href="#edit-education" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Education</a>
+                        <a href="#edit-documents" class="shrink-0 rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-800">Photo & resume</a>
+                    </nav>
+                <form action="/profile" method="post" enctype="multipart/form-data" class="grid gap-x-5 gap-y-5 sm:grid-cols-2">
+                    <input type="hidden" name="_token" :value="bootstrap.csrfToken"><input type="hidden" name="_method" value="PATCH">
+                    <div id="edit-contact" class="sm:col-span-2 scroll-mt-24"><h3 class="font-semibold text-slate-900">Contact and location</h3></div>
+                    <div><label for="edit-name" class="form-label">Full name</label><input id="edit-name" name="name" v-model="draft.user.name" required maxlength="255" class="form-field"><p v-if="fieldError('name')" class="field-error">{{ fieldError('name') }}</p></div>
+                    <div><label for="edit-email" class="form-label">Email address</label><input id="edit-email" name="email" v-model="draft.user.email" type="email" required maxlength="255" class="form-field"><p v-if="fieldError('email')" class="field-error">{{ fieldError('email') }}</p></div>
+                    <div><label for="edit-phone" class="form-label">Phone</label><input id="edit-phone" name="phone" v-model="draft.phone" type="tel" maxlength="40" class="form-field"><p v-if="fieldError('phone')" class="field-error">{{ fieldError('phone') }}</p></div>
+                    <div><label for="edit-region" class="form-label">Region or state</label><select id="edit-region" v-model="regionId" name="region_id" class="form-field"><option value="">Choose a region or state</option><option v-for="region in regions" :key="region.id" :value="String(region.id)">{{ region.name }} {{ region.type === 'state' ? 'State' : region.type === 'union_territory' ? 'Union Territory' : 'Region' }}</option></select><p v-if="fieldError('region_id')" class="field-error">{{ fieldError('region_id') }}</p></div>
+                    <div><label for="edit-township" class="form-label">Township</label><select id="edit-township" v-model="townshipId" name="township_id" :disabled="!regionId || townships.length === 0" class="form-field disabled:bg-slate-50"><option value="">Select township</option><option v-for="township in townships" :key="township.id" :value="String(township.id)">{{ township.name }}</option></select></div>
+                    <div id="edit-summary" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Professional summary</h3></div>
+                    <div><label for="edit-headline" class="form-label">Professional headline</label><input id="edit-headline" name="professional_title" v-model="draft.professional_title" maxlength="160" class="form-field"><p v-if="fieldError('professional_title')" class="field-error">{{ fieldError('professional_title') }}</p></div>
+                    <div><label for="edit-years" class="form-label">Years of experience</label><input id="edit-years" name="years_experience" v-model="draft.years_experience" type="number" min="0" max="60" class="form-field"><p v-if="fieldError('years_experience')" class="field-error">{{ fieldError('years_experience') }}</p></div>
+                    <div class="sm:col-span-2"><label for="edit-bio" class="form-label">Professional summary</label><textarea id="edit-bio" name="bio" v-model="draft.bio" rows="4" maxlength="5000" class="form-field"></textarea><p v-if="fieldError('bio')" class="field-error">{{ fieldError('bio') }}</p></div>
+                    <div id="edit-skills-section" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Skills and languages</h3></div>
+                    <div><label for="edit-skills" class="form-label">Skills, separated by commas</label><textarea id="edit-skills" name="skills_text" v-model="skillsText" rows="3" maxlength="2000" class="form-field"></textarea><p v-if="fieldError('skills_text')" class="field-error">{{ fieldError('skills_text') }}</p></div>
+                    <div><label for="edit-languages" class="form-label">Languages, separated by commas</label><textarea id="edit-languages" name="languages_text" v-model="languagesText" rows="3" maxlength="1000" class="form-field"></textarea><p v-if="fieldError('languages_text')" class="field-error">{{ fieldError('languages_text') }}</p></div>
+                    <div><label for="edit-desired-role" class="form-label">Desired job title</label><input id="edit-desired-role" name="desired_job_title" v-model="draft.desired_job_title" maxlength="160" class="form-field"></div>
+                    <div><label for="edit-availability" class="form-label">Availability</label><select id="edit-availability" name="availability" v-model="draft.availability" class="form-field"><option value="">Select availability</option><option v-for="option in availabilityOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
+                    <div><label for="edit-employment" class="form-label">Employment type</label><select id="edit-employment" name="employment_type" v-model="draft.employment_type" class="form-field"><option value="">Select employment type</option><option v-for="option in employmentOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
+                    <div><label for="edit-work-mode" class="form-label">Work mode</label><select id="edit-work-mode" name="work_mode" v-model="draft.work_mode" class="form-field"><option value="">Select work mode</option><option v-for="option in workModeOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>
+                    <div><label for="edit-salary-min" class="form-label">Minimum expected salary (MMK / month)</label><input id="edit-salary-min" name="expected_salary_min" v-model="draft.expected_salary_min" type="number" min="0" class="form-field"><p v-if="fieldError('expected_salary_min')" class="field-error">{{ fieldError('expected_salary_min') }}</p></div>
+                    <div><label for="edit-salary-max" class="form-label">Maximum expected salary (MMK / month)</label><input id="edit-salary-max" name="expected_salary_max" v-model="draft.expected_salary_max" type="number" min="0" class="form-field"><p v-if="fieldError('expected_salary_max')" class="field-error">{{ fieldError('expected_salary_max') }}</p></div>
+
+                    <div id="edit-preferences" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Job preferences</h3></div>
+                    <div id="edit-experience" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Work experience</h3></div>
+                    <fieldset v-for="(item, index) in draft.experiences" :key="item.id ?? `new-experience-${index}`" class="grid gap-4 rounded-xl border border-slate-200 p-4 sm:col-span-2 sm:grid-cols-2">
+                        <legend class="px-2 text-sm font-semibold text-slate-700">Position {{ index + 1 }}</legend>
+                        <div><label :for="`edit-exp-title-${index}`" class="form-label">Job title</label><input :id="`edit-exp-title-${index}`" v-model="item.job_title" :name="`experiences[${index}][job_title]`" maxlength="160" class="form-field"><p v-if="nestedError('experiences', index, 'job_title')" class="field-error">{{ nestedError('experiences', index, 'job_title') }}</p></div>
+                        <div><label :for="`edit-exp-employer-${index}`" class="form-label">Employer</label><input :id="`edit-exp-employer-${index}`" v-model="item.employer_name" :name="`experiences[${index}][employer_name]`" maxlength="160" class="form-field"><p v-if="nestedError('experiences', index, 'employer_name')" class="field-error">{{ nestedError('experiences', index, 'employer_name') }}</p></div>
+                        <div><label :for="`edit-exp-location-${index}`" class="form-label">Location</label><input :id="`edit-exp-location-${index}`" v-model="item.location" :name="`experiences[${index}][location]`" maxlength="160" class="form-field"></div>
+                        <div class="grid grid-cols-2 gap-3"><label class="form-label">Start date<input v-model="item.started_on" :name="`experiences[${index}][started_on]`" type="date" class="form-field mt-1.5"></label><label class="form-label">End date<input v-model="item.ended_on" :name="`experiences[${index}][ended_on]`" type="date" :disabled="item.is_current" class="form-field mt-1.5 disabled:bg-slate-50"></label></div>
+                        <label class="flex items-center gap-2 text-sm text-slate-700"><input v-model="item.is_current" :name="`experiences[${index}][is_current]`" type="checkbox" value="1" class="rounded border-slate-300 accent-blue-700">I currently work here</label>
+                        <div class="sm:col-span-2"><label :for="`edit-exp-description-${index}`" class="form-label">Responsibilities and achievements</label><textarea :id="`edit-exp-description-${index}`" v-model="item.description" :name="`experiences[${index}][description]`" rows="2" maxlength="5000" class="form-field"></textarea></div>
+                        <button v-if="draft.experiences.length > 1" type="button" class="justify-self-start text-sm font-medium text-red-700 hover:underline" @click="draft.experiences.splice(index, 1)">Remove position</button>
+                    </fieldset>
+                    <button type="button" class="sm:col-span-2 justify-self-start rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50" @click="addExperience">+ Add position</button>
+
+                    <div id="edit-education" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Education</h3></div>
+                    <fieldset v-for="(item, index) in draft.educations" :key="item.id ?? `new-education-${index}`" class="grid gap-4 rounded-xl border border-slate-200 p-4 sm:col-span-2 sm:grid-cols-2">
+                        <legend class="px-2 text-sm font-semibold text-slate-700">Education {{ index + 1 }}</legend>
+                        <div><label :for="`edit-edu-school-${index}`" class="form-label">Institution</label><input :id="`edit-edu-school-${index}`" v-model="item.institution" :name="`educations[${index}][institution]`" maxlength="180" class="form-field"><p v-if="nestedError('educations', index, 'institution')" class="field-error">{{ nestedError('educations', index, 'institution') }}</p></div>
+                        <div><label :for="`edit-edu-qualification-${index}`" class="form-label">Qualification</label><input :id="`edit-edu-qualification-${index}`" v-model="item.qualification" :name="`educations[${index}][qualification]`" maxlength="160" class="form-field"></div>
+                        <div><label :for="`edit-edu-field-${index}`" class="form-label">Field of study</label><input :id="`edit-edu-field-${index}`" v-model="item.field_of_study" :name="`educations[${index}][field_of_study]`" maxlength="160" class="form-field"></div>
+                        <div class="grid grid-cols-2 gap-3"><label class="form-label">Start year<input v-model="item.started_year" :name="`educations[${index}][started_year]`" type="number" min="1900" :max="new Date().getFullYear()" class="form-field mt-1.5"></label><label class="form-label">Completion year<input v-model="item.graduated_year" :name="`educations[${index}][graduated_year]`" type="number" min="1900" :max="new Date().getFullYear() + 10" class="form-field mt-1.5"></label></div>
+                        <div class="sm:col-span-2"><label :for="`edit-edu-description-${index}`" class="form-label">Additional details</label><textarea :id="`edit-edu-description-${index}`" v-model="item.description" :name="`educations[${index}][description]`" rows="2" maxlength="3000" class="form-field"></textarea></div>
+                        <button v-if="draft.educations.length > 1" type="button" class="sm:col-span-2 justify-self-start text-sm font-medium text-red-700 hover:underline" @click="draft.educations.splice(index, 1)">Remove education</button>
+                    </fieldset>
+                    <button type="button" class="sm:col-span-2 justify-self-start rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50" @click="addEducation">+ Add education</button>
+
+                    <div id="edit-documents" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Profile photo and resume</h3></div>
+                    <div><label for="edit-photo" class="form-label">Replace profile photo</label><input id="edit-photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="form-field text-xs"></div>
+                    <div><label for="edit-resume" class="form-label">Upload or replace resume / CV</label><input id="edit-resume" name="cv" type="file" accept=".pdf,.doc,.docx" class="form-field text-xs"><p v-if="fieldError('cv')" class="field-error">{{ fieldError('cv') }}</p></div>
+                    <div><label for="edit-password" class="form-label">Change password <span class="font-normal text-slate-500">(leave blank to keep current)</span></label><input id="edit-password" name="password" type="password" autocomplete="new-password" minlength="8" class="form-field"></div>
+                    <div><label for="edit-password-confirmation" class="form-label">Confirm new password</label><input id="edit-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" class="form-field"></div>
+                    <div class="sm:col-span-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
+                        <button type="submit" class="rounded-lg bg-[var(--brand-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--brand-primary-hover)]">Save profile</button>
+                        <button type="button" class="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" @click="editing = false">Cancel</button>
+                        <p v-if="fieldError('profile_photo')" class="field-error">{{ fieldError('profile_photo') }}</p>
+                    </div>
+                </form>
+                </div>
+            </section>
         </div>
-        <div class="px-6 py-8 mx-auto w-full max-w-[1200px] max-sm:px-4">
-          <div class="flex justify-between items-start mb-2 max-sm:flex-col max-sm:gap-4">
-            <div>
-              <div class="mb-1 text-3xl font-bold tracking-normal leading-9 text-gray-900">Zayar Min</div>
-              <div class="mb-2 text-base font-medium leading-6 text-blue-600">Senior Odoo Developer in Yangon</div>
-              <div class="flex flex-wrap gap-4 items-center max-sm:gap-2">
-                <div class="flex gap-1 items-center">
-                  <i class="ti ti-map-pin text-sm text-gray-500" />
-                  <div class="text-sm leading-5 text-gray-500">Kamayut, Yangon</div>
-                </div>
-                <div class="flex gap-1 items-center">
-                  <i class="ti ti-mail text-sm text-gray-500" />
-                  <div class="text-sm leading-5 text-gray-500">zayarm@gmail.com</div>
-                </div>
-                <div class="flex gap-1 items-center">
-                  <i class="ti ti-phone text-sm text-gray-500" />
-                  <div class="text-sm leading-5 text-gray-500">+95 9 4210 12345</div>
-                </div>
-              </div>
-            </div>
-            <button type="button" class="px-5 py-2.5 text-sm font-semibold leading-5 text-white bg-cyan-900 rounded-lg" @click="announce('Profile editing is ready.')">Edit Profile</button>
-          </div>
-          <div class="flex flex-wrap gap-3 justify-between items-center mt-4">
-            <div class="flex gap-2 items-center">
-              <div class="flex gap-1.5 items-center px-3 py-1.5 rounded-3xl border border-emerald-500 border-solid">
-                <div class="w-2 h-2 bg-emerald-500 rounded-full" />
-                <div class="text-xs font-semibold leading-4 text-emerald-500">OPEN TO WORK</div>
-              </div>
-              <div class="text-sm leading-5 text-gray-500">Actively looking for full-time or contract roles</div>
-            </div>
-            <div class="flex gap-6 items-center">
-              <div class="flex gap-1.5 items-center">
-                <div class="text-base font-bold leading-5 text-gray-900">14</div>
-                <div class="text-sm leading-5 text-gray-500">Applications Sent</div>
-              </div>
-              <div class="flex gap-1.5 items-center">
-                <div class="text-base font-bold leading-5 text-gray-900">128</div>
-                <div class="text-sm leading-5 text-gray-500">Profile Views</div>
-              </div>
-              <a href="data:text/plain;charset=utf-8,Zayar%20Min%20-%20Senior%20Odoo%20Developer" download="Zayar_Min_CV.txt" class="px-4 py-2 text-sm font-medium leading-5 text-gray-700 bg-white rounded-md border border-gray-300 border-solid">Download CV PDF</a>
-            </div>
-          </div>
-          <p v-if="profileNotice" class="mt-3 rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700" role="status">{{ profileNotice }}</p>
-        </div>
-        <div class="px-6 pb-12 mx-auto w-full max-w-[1200px] max-sm:px-4">
-          <div class="flex gap-6 max-md:flex-col">
-            <div class="flex flex-col flex-1 gap-5">
-              <div class="p-7 bg-white rounded-xl border border border-solid">
-                <div class="mb-1 text-lg font-bold leading-7 text-gray-900">About Me</div>
-                <div class="mb-4 text-sm leading-5 text-blue-600">Professional summary of skills and career goals</div>
-                <div class="text-sm leading-6 text-gray-700">Senior Odoo &amp; ERP Developer with over 6 years of experience configuring, customizing, and deploying robust business systems in Myanmar. Well-versed in Odoo custom module development, Python, PostgreSQL, and JavaScript. Deeply committed to empowering local financial and retail companies by building high-availability tools and clean database integrations. Fluent in English and native Burmese.</div>
-              </div>
-              <div class="p-7 bg-white rounded-xl border border border-solid">
-                <div class="mb-1 text-lg font-bold leading-7 text-gray-900">Professional Experience</div>
-                <div class="mb-6 text-sm leading-5 text-blue-600">My employment history and roles</div>
-                <div class="mb-7">
-                  <div class="flex justify-between items-start mb-1.5 max-sm:flex-col max-sm:gap-1">
-                    <div class="text-base font-semibold leading-6 text-gray-900">Lead Odoo Developer</div>
-                    <div class="text-sm leading-5 text-gray-500">Jun 2023 - Present</div>
-                  </div>
-                  <div class="mb-2.5 text-sm leading-5 text-blue-600">KBZ Group · Yangon, Myanmar</div>
-                  <div class="flex flex-col gap-1.5">
-                    <div class="flex gap-1.5 items-start">
-                      <div class="text-sm leading-5 text-gray-700">• Led customization of Odoo v16/v17 modules across banking &amp; hospitality divisions.</div>
-                    </div>
-                    <div class="flex gap-1.5 items-start">
-                      <div class="text-sm leading-5 text-gray-700">• Managed a team of 4 junior Python developers to deliver clean database schemas.</div>
-                    </div>
-                    <div class="flex gap-1.5 items-start">
-                      <div class="text-sm leading-5 text-gray-700">• Enhanced system uptime by 30% through robust API and performance optimization.</div>
-                    </div>
-                  </div>
-                </div>
-                <div class="pt-6 border border-t">
-                  <div class="flex justify-between items-start mb-1.5 max-sm:flex-col max-sm:gap-1">
-                    <div class="text-base font-semibold leading-6 text-gray-900">ERP Systems Engineer</div>
-                    <div class="text-sm leading-5 text-gray-500">Jan 2021 - May 2023</div>
-                  </div>
-                  <div class="mb-2.5 text-sm leading-5 text-blue-600">Wave Money · Bahan, Yangon</div>
-                  <div class="flex flex-col gap-1.5">
-                    <div class="flex gap-1.5 items-start">
-                      <div class="text-sm leading-5 text-gray-700">• Engineered automated payroll &amp; reconciliation modules natively inside Python.</div>
-                    </div>
-                    <div class="flex gap-1.5 items-start">
-                      <div class="text-sm leading-5 text-gray-700">• Scaled secure data migration pipelines for over 100,000 active agency logs.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="p-7 bg-white rounded-xl border border border-solid">
-                <div class="mb-1 text-lg font-bold leading-7 text-gray-900">Education &amp; Certifications</div>
-                <div class="mb-5">
-                  <div class="mb-0.5 text-base font-semibold leading-6 text-gray-900">B.C.Sc. Computer Science</div>
-                  <div class="mb-0.5 text-sm leading-5 text-blue-600">University of Computer Studies, Yangon (UCSY)</div>
-                  <div class="text-xs leading-4 text-gray-400">Class of 2019</div>
-                </div>
-                <div class="pt-5 border border-t">
-                  <div class="mb-0.5 text-base font-semibold leading-6 text-gray-900">Certified Odoo Consultant (v16)</div>
-                  <div class="mb-0.5 text-sm leading-5 text-blue-600">Odoo Professional Academy</div>
-                  <div class="text-xs leading-4 text-gray-400">Licensed 2023</div>
-                </div>
-              </div>
-              <div class="p-7 bg-white rounded-xl border border border-solid">
-                <div class="mb-5 text-lg font-bold leading-7 text-gray-900">Skills &amp; Specialties</div>
-                <div class="mb-4">
-                  <div class="mb-2.5 text-xs font-semibold tracking-wide leading-4 text-blue-600 uppercase">TECHNICAL SKILLS</div>
-                  <div class="flex flex-wrap gap-2">
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Python</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Odoo ERP</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">PostgreSQL</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">JavaScript</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Docker</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">REST APIs</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Git</div>
-                  </div>
-                </div>
-                <div>
-                  <div class="mb-2.5 text-xs font-semibold tracking-wide leading-4 text-blue-600 uppercase">SOFT SKILLS &amp; LANGUAGES</div>
-                  <div class="flex flex-wrap gap-2">
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Technical Mentorship</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">Agile Sprints</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">fluent English</div>
-                    <div class="px-3 py-1.5 text-sm leading-5 text-gray-700 bg-gray-50 rounded-3xl border border-gray-300 border-solid">native Burmese</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="flex flex-col gap-5 w-80 max-md:w-full">
-              <div class="p-6 bg-white rounded-xl border border border-solid">
-                <div class="flex justify-between items-center mb-3">
-                  <div class="text-base font-semibold leading-6 text-gray-900">Profile Completeness</div>
-                  <div class="text-base font-bold leading-6 text-emerald-500">85%</div>
-                </div>
-                <div class="mb-3 w-full h-2 bg-gray-200 rounded-full">
-                  <div class="h-2 bg-emerald-500 rounded-full w-[85%]" />
-                </div>
-                <div class="text-xs leading-4 text-gray-500">Add a summary video or portfolio links to reach 100%!</div>
-              </div>
-              <div class="p-6 bg-white rounded-xl border border border-solid">
-                <div class="mb-4 text-base font-semibold leading-6 text-gray-900">Uploaded Documents</div>
-                <div class="flex gap-3 items-center mb-3">
-                  <div class="flex justify-center items-center w-9 h-9 bg-blue-50 rounded-lg flex-[shrink]">
-                    <i class="ti ti-file-text text-lg text-blue-600" />
-                  </div>
-                  <div>
-                    <div class="text-sm font-medium leading-5 text-gray-900">Zayar_Min_Resume_2026.pdf</div>
-                    <div class="text-xs leading-4 text-gray-400">PDF · 2.4 MB · Updated 2 days ago</div>
-                  </div>
-                </div>
-                <div class="flex gap-3 items-center">
-                  <div class="flex justify-center items-center w-9 h-9 bg-blue-50 rounded-lg flex-[shrink]">
-                    <i class="ti ti-briefcase text-lg text-blue-600" />
-                  </div>
-                  <div>
-                    <div class="text-sm font-medium leading-5 text-gray-900">ERP_Case_Studies.pdf</div>
-                    <div class="text-xs leading-4 text-gray-400">PDF · 4.8 MB · Updated 1 week ago</div>
-                  </div>
-                </div>
-              </div>
-              <div class="p-6 bg-white rounded-xl border border border-solid">
-                <div class="mb-4 text-base font-semibold leading-6 text-gray-900">Recommended for Your Profile</div>
-                <a href="#search" class="block p-4 mb-3 rounded-xl border border border-solid cursor-pointer">
-                  <div class="flex justify-between items-center mb-1">
-                    <div class="text-sm font-semibold leading-5 text-gray-900">ERP Developer</div>
-                    <div class="text-xs leading-4 text-gray-500">Yangon</div>
-                  </div>
-                  <div class="mb-1.5 text-xs leading-4 text-gray-500">CDSG Group</div>
-                  <div class="text-xs font-semibold leading-4 text-emerald-500">1,500,000 - 2,000,000 MMK</div>
-                </a>
-                <a href="#search" class="block p-4 rounded-xl border border border-solid cursor-pointer">
-                  <div class="flex justify-between items-center mb-1">
-                    <div class="text-sm font-semibold leading-5 text-gray-900">Senior Python Developer</div>
-                    <div class="text-xs leading-4 text-gray-500">Mandalay (Remote)</div>
-                  </div>
-                  <div class="mb-1.5 text-xs leading-4 text-gray-500">Wave Money</div>
-                  <div class="text-xs font-semibold leading-4 text-emerald-500">1,800,000 - 2,500,000 MMK</div>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="mt-0 bg-cyan-900">
-          <div class="px-6 py-8 mx-auto max-w-[1200px] max-sm:px-4">
-            <div class="flex justify-between items-center max-sm:flex-col max-sm:gap-4 max-sm:items-start">
-              <div class="flex gap-2 items-center">
-                <div class="text-base font-bold leading-6 text-white">NDK</div>
-                <div class="text-sm leading-5 text-blue-300">· Myanmar's Leading Professional Network</div>
-              </div>
-              <div class="flex flex-wrap gap-6 items-center max-sm:gap-4">
-                <div class="text-sm leading-5 text-blue-300 cursor-pointer">About NDK</div>
-                <div class="text-sm leading-5 text-blue-300 cursor-pointer">Privacy Policy</div>
-                <div class="text-sm leading-5 text-blue-300 cursor-pointer">Terms</div>
-                <div class="text-sm leading-5 text-blue-300 cursor-pointer">Contact Support</div>
-              </div>
-            </div>
-            <div class="pt-5 mt-6 border-t border-cyan-800">
-              <div class="text-xs leading-4 text-center text-slate-400">© 2026 NDK Job Platform. Connecting Myanmar's brightest talent with premium local &amp; multinational employers.</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    </section>
+    <section v-else class="mx-auto max-w-3xl px-5 py-16 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Your seeker profile is unavailable</h1>
+        <p class="mt-2 text-sm text-slate-600">Sign in with a job seeker account to view and update your profile.</p>
+    </section>
 </template>
+
+<style scoped>
+@reference "../../css/app.css";
+.form-label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
+.form-field { @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100; }
+.field-error { @apply mt-1.5 text-sm text-red-700; }
+</style>

@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JobSeeker extends Model
 {
-    protected $fillable = ['user_id', 'region_id', 'township_id', 'cv_path', 'skills', 'languages', 'status', 'bio'];
+    protected $fillable = [
+        'user_id', 'region_id', 'township_id', 'phone', 'profile_photo_path', 'cv_path', 'cv_original_name',
+        'professional_title', 'years_experience', 'desired_job_title', 'employment_type',
+        'work_mode', 'expected_salary_min', 'expected_salary_max', 'availability',
+        'skills', 'languages', 'status', 'bio',
+    ];
     protected function casts(): array { return ['skills' => 'array', 'languages' => 'array', 'status' => 'boolean']; }
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
@@ -17,6 +22,8 @@ class JobSeeker extends Model
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function applications(): HasMany { return $this->hasMany(Application::class); }
     public function savedJobs(): HasMany { return $this->hasMany(SavedJob::class); }
+    public function experiences(): HasMany { return $this->hasMany(JobSeekerExperience::class)->orderBy('sort_order')->orderByDesc('started_on'); }
+    public function educations(): HasMany { return $this->hasMany(JobSeekerEducation::class)->orderBy('sort_order')->orderByDesc('graduated_year'); }
 
     public function searchJobs(array $filters = []): Builder
     {

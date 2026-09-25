@@ -1,7 +1,6 @@
 <script setup>
 import { ref } from 'vue';
 
-const mobileMenuOpen = ref(false);
 const dashboardNotice = ref('');
 const pausedJobs = ref([]);
 const closedJobs = ref([]);
@@ -25,35 +24,6 @@ function closeJob(job) {
 
 <template>
       <div class="flex flex-col bg-slate-100 min-h-screen">
-        <header class="bg-white border-b">
-          <nav class="flex justify-between items-center px-6 py-0 h-16 max-sm:px-4" aria-label="Main navigation">
-          <div class="flex gap-2 items-center">
-            <div class="flex gap-1.5 items-center">
-              <i class="ti ti-user text-lg text-gray-500" />
-              <span class="text-xl font-bold tracking-normal text-blue-700">NDK</span>
-              <span class="px-2 py-0.5 text-xs font-semibold tracking-wider text-blue-700 uppercase bg-blue-100 rounded">Myanmar</span>
-            </div>
-          </div>
-          <div class="flex gap-8 items-center max-md:hidden">
-            <a href="#search" class="text-sm text-gray-700">Jobs</a>
-            <a href="#companies" class="text-sm text-gray-700">Companies</a>
-            <span class="pb-0.5 text-sm font-semibold text-blue-700 border-2 border-blue-700 cursor-pointer">Dashboard</span>
-          </div>
-          <div class="flex gap-3 items-center">
-            <i class="ti ti-search text-xl text-gray-500 cursor-pointer max-sm:hidden" />
-            <div class="flex gap-2 items-center px-3.5 py-1.5 bg-blue-700 rounded-full cursor-pointer max-sm:hidden">
-              <div class="flex justify-center items-center w-4 h-4 bg-white rounded-full">
-                <div class="w-2 h-2 bg-blue-700 rounded-full" />
-              </div>
-              <span class="text-sm font-medium text-white">Recruiter Mode</span>
-            </div>
-            <span class="text-sm text-gray-700 cursor-pointer max-sm:hidden">Sign Out</span>
-            <a href="#post-job" class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg max-sm:hidden">Post a Job</a>
-            <button type="button" class="hidden text-2xl text-gray-700 max-md:block" :aria-expanded="mobileMenuOpen" aria-label="Toggle navigation menu" @click="mobileMenuOpen = !mobileMenuOpen"><i class="ti ti-menu-2" /></button>
-          </div>
-          </nav>
-          <div v-if="mobileMenuOpen" class="hidden max-md:flex flex-col gap-3 border-t px-6 py-4 text-sm"><a href="#search" @click="mobileMenuOpen = false">Jobs</a><a href="#companies" @click="mobileMenuOpen = false">Companies</a><a href="#profile" @click="mobileMenuOpen = false">Dashboard</a><a href="#post-job" @click="mobileMenuOpen = false">Post a Job</a></div>
-        </header>
         <div class="px-10 py-6 max-md:px-6 max-sm:px-4">
           <div class="flex justify-between items-center mb-6">
             <div class="flex gap-3 items-center">

@@ -1,9 +1,10 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
 
-defineProps({
+const props = defineProps({
     isAuthenticated: { type: Boolean, default: false },
     csrfToken: { type: String, default: '' },
+    userRole: { type: String, default: '' },
 });
 
 const menuOpen = ref(false);
@@ -23,18 +24,26 @@ onUnmounted(() => {
     window.removeEventListener('popstate', updateCurrentLocation);
 });
 
-const links = [
+const publicLinks = [
     { label: 'Home', href: '/' },
     { label: 'Jobs', href: '/#search' },
     { label: 'Salary Insights', href: '/#insights' },
-    { label: 'Skills', href: '/#skills-assessment' },
-    { label: 'Candidates', href: '/#pipeline' },
-    { label: 'Messages', href: '/#messages' },
-    { label: 'Dashboard', href: '/#dashboard' },
-    { label: 'My Profile', href: '/#profile' },
+];
+const links = [
+    ...publicLinks,
+    ...(props.isAuthenticated && props.userRole === 'job_seeker' ? [
+        { label: 'Skills', href: '/#skills-assessment' },
+        { label: 'My Profile', href: '/profile' },
+    ] : []),
+    ...(props.isAuthenticated && props.userRole === 'employer' ? [
+        { label: 'Candidates', href: '/#pipeline' },
+        { label: 'Dashboard', href: '/#dashboard' },
+    ] : []),
+    ...(props.isAuthenticated ? [{ label: 'Messages', href: '/#messages' }] : []),
 ];
 
 function isActive(link) {
+    if (link.href === '/profile') return currentPath.value === '/profile' || currentHash.value === '#profile';
     if (link.href === '/') {
         return currentPath.value === '/' && !currentHash.value && pageType !== 'search';
     }
@@ -58,7 +67,7 @@ function isActive(link) {
 
             <div class="hidden shrink-0 items-center gap-3 md:flex">
                 <template v-if="isAuthenticated">
-                    <a href="/#post-job" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">Post a Job</a>
+                    <a v-if="userRole === 'employer'" href="/#post-job" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">Post a Job</a>
                     <form action="/logout" method="post">
                         <input type="hidden" name="_token" :value="csrfToken">
                         <button type="submit" class="rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Sign out</button>
@@ -79,7 +88,7 @@ function isActive(link) {
             <div class="mx-auto flex max-w-[1440px] flex-col gap-1">
                 <a v-for="link in links" :key="link.href" :href="link.href" :aria-current="isActive(link) ? 'page' : undefined" :class="isActive(link) ? 'bg-blue-50 font-semibold text-blue-800 ring-1 ring-blue-200' : 'font-medium text-slate-700 hover:bg-slate-50'" class="rounded-lg px-3 py-2.5 text-sm" @click="menuOpen = false">{{ link.label }}</a>
                 <template v-if="isAuthenticated">
-                    <a href="/#post-job" class="mt-1 rounded-lg bg-[var(--brand-primary)] px-3 py-2.5 text-center text-sm font-semibold text-white" @click="menuOpen = false">Post a Job</a>
+                    <a v-if="userRole === 'employer'" href="/#post-job" class="mt-1 rounded-lg bg-[var(--brand-primary)] px-3 py-2.5 text-center text-sm font-semibold text-white" @click="menuOpen = false">Post a Job</a>
                     <form action="/logout" method="post" class="mt-1">
                         <input type="hidden" name="_token" :value="csrfToken">
                         <button type="submit" class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">Sign out</button>

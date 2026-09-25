@@ -12,7 +12,6 @@ const salaryMin = ref('');
 const salaryMax = ref('');
 const datePosted = ref('');
 const advancedFiltersOpen = ref(false);
-const mobileMenuOpen = ref(false);
 const savedJobs = ref([]);
 const regions = window.__AUTH_BOOTSTRAP__?.regions ?? [];
 const townships = computed(() => regions.find((region) => String(region.id) === regionId.value)?.townships ?? []);
@@ -59,37 +58,6 @@ function toggleSavedJob(title) {
 
 <template>
       <div class="bg-white min-h-screen">
-        <header class="bg-white border-b">
-          <nav class="flex justify-between items-center px-8 py-0 h-16 max-sm:px-4" aria-label="Main navigation">
-          <div class="flex gap-2 items-center">
-            <div class="flex gap-1.5 items-center">
-              <div class="w-2 h-2 bg-gray-500 rounded-full" />
-              <span class="text-lg font-bold tracking-normal leading-6 text-gray-900">NDK</span>
-              <span class="px-1.5 py-0.5 text-xs font-semibold tracking-wider text-blue-500 uppercase bg-blue-100 rounded">MYANMAR</span>
-            </div>
-          </div>
-          <div class="flex gap-8 items-center max-sm:hidden">
-            <div class="flex gap-8 items-center">
-              <span class="pt-6 pb-5 text-sm font-semibold leading-5 text-gray-900 border-2 border-blue-500 cursor-pointer">Jobs</span>
-              <span class="text-sm leading-5 text-gray-500 cursor-pointer">Companies</span>
-              <span class="text-sm leading-5 text-gray-500 cursor-pointer">Resources</span>
-            </div>
-          </div>
-          <div class="flex gap-3 items-center">
-            <div class="flex gap-3 items-center max-sm:hidden">
-              <i class="ti ti-search text-xl text-gray-500 cursor-pointer" />
-              <div class="flex gap-1.5 items-center px-3 py-1.5 bg-blue-50 rounded-3xl border border-blue-200 border-solid cursor-pointer">
-                <div class="w-4 h-4 bg-blue-500 rounded-full" />
-                <span class="text-sm font-medium text-blue-500">Recruiter Mode</span>
-              </div>
-              <span class="text-sm font-medium text-gray-700 cursor-pointer">Sign In</span>
-              <div class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg cursor-pointer">Post a Job</div>
-            </div>
-            <button type="button" class="hidden items-center max-sm:flex" :aria-expanded="mobileMenuOpen" aria-label="Toggle navigation menu" @click="mobileMenuOpen = !mobileMenuOpen"><i class="ti ti-menu-2 text-2xl text-gray-700" /></button>
-          </div>
-          </nav>
-          <div v-if="mobileMenuOpen" class="hidden max-sm:flex flex-col gap-3 border-t px-4 py-4 text-sm"><a href="#search" @click="mobileMenuOpen = false">Jobs</a><a href="#companies" @click="mobileMenuOpen = false">Companies</a><a href="#resources" @click="mobileMenuOpen = false">Resources</a><a href="#sign-in" @click="mobileMenuOpen = false">Sign In</a><a href="#post-job" @click="mobileMenuOpen = false">Post a Job</a></div>
-        </header>
         <div class="bg-gradient-to-br from-blue-50 via-white to-slate-100 px-5 py-16 sm:px-8 sm:py-20">
           <div class="mx-auto max-w-5xl text-center">
             <div class="mb-3 text-4xl font-extrabold tracking-tight text-[var(--brand-ink)] leading-tight sm:text-5xl">Find Your Next Opportunity in Myanmar</div>

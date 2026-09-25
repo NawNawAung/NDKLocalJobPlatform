@@ -7,6 +7,7 @@ use App\Http\Controllers\ConversationController;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
+Route::get('/profile', [AuthController::class, 'profilePage'])->middleware('auth')->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->middleware('guest')->name('login');
@@ -15,6 +16,7 @@ Route::get('/register', [AuthController::class, 'showRegister'])->middleware('gu
 Route::post('/register', [AuthController::class, 'register'])->middleware('guest')->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('auth')->name('profile.update');
+Route::get('/profile/resume', [AuthController::class, 'downloadResume'])->middleware('auth')->name('profile.resume');
 
 Route::middleware('auth')->prefix('api')->group(function () {
     Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');

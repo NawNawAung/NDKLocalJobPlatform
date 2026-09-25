@@ -1,3 +1,10 @@
+<script setup>
+defineProps({
+    isAuthenticated: { type: Boolean, default: false },
+    userRole: { type: String, default: '' },
+});
+</script>
+
 <template>
     <footer class="site-footer bg-[var(--brand-ink)] text-slate-300">
         <div class="mx-auto flex max-w-[1440px] flex-col gap-7 px-5 py-8 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
@@ -7,10 +14,10 @@
             </div>
             <nav class="flex flex-wrap gap-x-6 gap-y-3 text-sm" aria-label="Footer navigation">
                 <a href="/#search" class="transition hover:text-white">Find Jobs</a>
-                <a href="/#dashboard" class="transition hover:text-white">For Employers</a>
+                <a v-if="isAuthenticated && userRole === 'employer'" href="/#dashboard" class="transition hover:text-white">For Employers</a>
                 <a href="/#insights" class="transition hover:text-white">Salary Insights</a>
-                <a href="/#skills-assessment" class="transition hover:text-white">Skills Assessment</a>
-                <a href="/#messages" class="transition hover:text-white">Messages</a>
+                <a v-if="isAuthenticated && userRole === 'job_seeker'" href="/#skills-assessment" class="transition hover:text-white">Skills Assessment</a>
+                <a v-if="isAuthenticated" href="/#messages" class="transition hover:text-white">Messages</a>
             </nav>
             <div class="flex items-center gap-3" aria-label="Social media platforms">
                 <span role="img" aria-label="Facebook" title="Facebook" class="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-lg text-slate-300"><i class="ti ti-brand-facebook" aria-hidden="true" /></span>
