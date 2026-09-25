@@ -90,28 +90,28 @@ function toggleSavedJob(title) {
           <div class="mb-6 text-2xl font-bold leading-8 text-gray-900">Top Hiring Companies</div>
           <div class="grid grid-cols-4 gap-5 max-md:grid-cols-2 max-sm:grid-cols-1">
             <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" src="https://placehold.co/64x64/c8d9ef/c8d9ef" alt="KBZ Group Logo" />
+              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/kbzLogo.png'" alt="KBZ Group logo" />
               <div class="text-center">
                 <div class="text-base font-semibold leading-6 text-gray-900">KBZ Group</div>
                 <div class="text-sm leading-5 text-gray-500">42 Open Jobs</div>
               </div>
             </div>
             <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" src="https://placehold.co/64x64/c8d9ef/c8d9ef" alt="Grab Myanmar Logo" />
+              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/grabLogo.webp'" alt="Grab Myanmar logo" />
               <div class="text-center">
                 <div class="text-base font-semibold leading-6 text-gray-900">Grab Myanmar</div>
                 <div class="text-sm leading-5 text-gray-500">18 Open Jobs</div>
               </div>
             </div>
             <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" src="https://placehold.co/64x64/c8d9ef/c8d9ef" alt="Wave Money Logo" />
+              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/waveLogo.jpg'" alt="Wave Money logo" />
               <div class="text-center">
                 <div class="text-base font-semibold leading-6 text-gray-900">Wave Money</div>
                 <div class="text-sm leading-5 text-gray-500">12 Open Jobs</div>
               </div>
             </div>
             <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" src="https://placehold.co/64x64/c8d9ef/c8d9ef" alt="CDSG Group Logo" />
+              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/cdsgLogo.png'" alt="CDSG Group logo" />
               <div class="text-center">
                 <div class="text-base font-semibold leading-6 text-gray-900">CDSG Group</div>
                 <div class="text-sm leading-5 text-gray-500">25 Open Jobs</div>
@@ -123,29 +123,29 @@ function toggleSavedJob(title) {
           <div class="mb-6 text-2xl font-bold leading-8 text-gray-900">Popular Job Categories</div>
           <div class="grid grid-cols-4 gap-5 max-md:grid-cols-2 max-sm:grid-cols-1">
             <div class="flex flex-col gap-3 p-6 rounded-xl cursor-pointer bg-slate-400">
-              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-white bg-opacity-20">
-                <i class="ti ti-code text-xl text-white" />
+              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-blue-100">
+                <img :src="'/images/categories/technology.svg'" alt="" class="h-6 w-6 object-contain" />
               </div>
               <div class="text-base font-bold leading-6 text-white">Technology</div>
               <div class="text-sm leading-5 text-white text-opacity-80">340+ Jobs</div>
             </div>
             <div class="flex flex-col gap-3 p-6 rounded-xl cursor-pointer bg-slate-400">
-              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-white bg-opacity-20">
-                <i class="ti ti-building-bank text-xl text-white" />
+              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-blue-100">
+                <img :src="'/images/categories/finance.svg'" alt="" class="h-6 w-6 object-contain" />
               </div>
               <div class="text-base font-bold leading-6 text-white">Finance &amp; Banking</div>
               <div class="text-sm leading-5 text-white text-opacity-80">210+ Jobs</div>
             </div>
             <div class="flex flex-col gap-3 p-6 rounded-xl cursor-pointer bg-slate-400">
-              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-white bg-opacity-20">
-                <i class="ti ti-tool text-xl text-white" />
+              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-blue-100">
+                <img :src="'/images/categories/engineering.svg'" alt="" class="h-6 w-6 object-contain" />
               </div>
               <div class="text-base font-bold leading-6 text-white">Engineering</div>
               <div class="text-sm leading-5 text-white text-opacity-80">180+ Jobs</div>
             </div>
             <div class="flex flex-col gap-3 p-6 rounded-xl cursor-pointer bg-slate-400">
-              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-white bg-opacity-20">
-                <i class="ti ti-folder text-xl text-white" />
+              <div class="flex justify-center items-center w-10 h-10 rounded-lg bg-blue-100">
+                <img :src="'/images/categories/administration.svg'" alt="" class="h-6 w-6 object-contain" />
               </div>
               <div class="text-base font-bold leading-6 text-white">Administration</div>
               <div class="text-sm leading-5 text-white text-opacity-80">150+ Jobs</div>
@@ -162,7 +162,7 @@ function toggleSavedJob(title) {
           </div>
           <div class="flex flex-col gap-4">
             <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" src="https://placehold.co/56x56/c8d9ef/c8d9ef" alt="KBZ Group Logo" />
+              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/kbzLogo.png'" alt="KBZ Group logo" />
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap gap-2.5 items-center mb-1">
                   <span class="text-base font-semibold leading-6 text-gray-900">Senior Developer</span>
@@ -183,7 +183,7 @@ function toggleSavedJob(title) {
               </div>
             </div>
             <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" src="https://placehold.co/56x56/c8d9ef/c8d9ef" alt="Grab Myanmar Logo" />
+              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/grabLogo.webp'" alt="Grab Myanmar logo" />
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap gap-2.5 items-center mb-1">
                   <span class="text-base font-semibold leading-6 text-gray-900">Operations Executive</span>
@@ -204,7 +204,7 @@ function toggleSavedJob(title) {
               </div>
             </div>
             <div class="flex gap-4 items-center p-5 rounded-xl border border border-solid max-sm:flex-col max-sm:items-start">
-              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" src="https://placehold.co/56x56/c8d9ef/c8d9ef" alt="Wave Money Logo" />
+              <img class="w-[56px] h-[56px] rounded-[8px] object-cover flex-shrink-0" :src="'/images/companies/waveLogo.jpg'" alt="Wave Money logo" />
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap gap-2.5 items-center mb-1">
                   <span class="text-base font-semibold leading-6 text-gray-900">Customer Support Officer</span>

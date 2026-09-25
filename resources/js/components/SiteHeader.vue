@@ -16,10 +16,8 @@ const links = [
 <template>
     <header class="site-header sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
         <nav class="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-6 px-5 sm:px-8" aria-label="Main navigation">
-            <a href="#home" class="flex shrink-0 items-center gap-2.5" aria-label="NDK Myanmar home">
-                <span class="grid h-9 w-9 place-items-center rounded-lg bg-[var(--brand-primary)] text-sm font-extrabold tracking-tight text-white">N</span>
-                <span class="text-lg font-extrabold tracking-tight text-[var(--brand-ink)]">NDK</span>
-                <span class="rounded-md bg-[var(--brand-tint)] px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-[var(--brand-primary)]">MYANMAR</span>
+            <a href="#home" class="flex h-14 shrink-0 items-center" aria-label="NDK Myanmar home">
+                <img :src="'/images/brand/NDKJobPlatformLogo.jpeg'" alt="NDK Myanmar" class="h-12 w-auto max-w-52 object-contain" />
             </a>
 
             <div class="hidden items-center gap-5 xl:flex">
