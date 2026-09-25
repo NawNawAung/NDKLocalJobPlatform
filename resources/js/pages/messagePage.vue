@@ -13,14 +13,6 @@ function sendMessage() {
 </script>
 
 <template>
-      <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
-      />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
       <div class="flex flex-col bg-slate-100 min-h-screen">
         <div class="flex top-0 z-50 justify-between items-center px-6 py-0 bg-white border border-b h-[60px]">
           <div class="flex gap-2 items-center">

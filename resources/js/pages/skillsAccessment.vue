@@ -1,12 +1,4 @@
 <template>
-      <link
-        rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
-      />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
       <div class="flex flex-col bg-white min-h-screen">
         <div class="flex top-0 z-50 justify-between items-center px-8 py-4 bg-white border border-b">
           <div class="flex gap-4 items-center">

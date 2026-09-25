@@ -22,11 +22,6 @@ function toggleSavedJob(title) {
 </script>
 
 <template>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
       <div class="bg-white min-h-screen">
         <header class="bg-white border-b">
           <nav class="flex justify-between items-center px-8 py-0 h-16 max-sm:px-4" aria-label="Main navigation">

@@ -10,11 +10,6 @@ function announce(message) {
 </script>
 
 <template>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
       <div class="flex flex-col bg-gray-100 min-h-screen">
         <header class="sticky top-0 z-50 bg-white border-b">
           <nav class="flex justify-between items-center px-6 h-14" aria-label="Main navigation">

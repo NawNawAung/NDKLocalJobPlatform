@@ -1,5 +1,5 @@
 import './bootstrap';
-import { computed, createApp, ref } from 'vue';
+import { computed, createApp, h, ref } from 'vue';
 import Home from './pages/home.vue';
 import JobDetails from './pages/jobDetails.vue';
 import JobSearch from './pages/jobSearch.vue';
@@ -10,6 +10,8 @@ import EmployerDashboard from './pages/employerDashboard.vue';
 import InsightPage from './pages/insightPage.vue';
 import MessagePage from './pages/messagePage.vue';
 import SkillsAssessment from './pages/skillsAccessment.vue';
+import SiteHeader from './components/SiteHeader.vue';
+import SiteFooter from './components/SiteFooter.vue';
 
 const pages = {
     '#details': JobDetails,
@@ -32,7 +34,10 @@ createApp({
     setup() {
         const currentPage = computed(() => pages[currentHash.value] ?? Home);
 
-        return { currentPage };
+        return () => h('div', { class: 'min-h-screen bg-slate-50 text-slate-900' }, [
+            h(SiteHeader),
+            h('main', { id: 'page-content' }, [h(currentPage.value)]),
+            h(SiteFooter),
+        ]);
     },
-    template: '<component :is="currentPage" />',
 }).mount('#app');
