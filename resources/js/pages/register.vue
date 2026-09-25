@@ -27,7 +27,9 @@ function regionLabel(region) {
     <section class="px-5 py-10 sm:px-8 sm:py-14">
         <div class="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
             <div class="mb-8 text-center">
-                <span class="text-sm font-bold tracking-wide text-[var(--brand-primary)]">JOIN NDK</span>
+                <a href="/" class="mb-4 inline-flex items-center justify-center" aria-label="NDK Job Platform home">
+                    <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform logo" class="block h-20 w-20 object-contain sm:h-24 sm:w-24" />
+                </a>
                 <h1 class="mt-2 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Create your account</h1>
                 <p class="mt-2 text-sm text-slate-600">Get started with opportunities and talent across Myanmar.</p>
             </div>

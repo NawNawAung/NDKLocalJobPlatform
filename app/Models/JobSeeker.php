@@ -30,7 +30,18 @@ class JobSeeker extends Model
     public function applyForJob(Job $job, array $attributes = []): Application
     {
         abort_unless($job->status === 'published', 422, 'This job is not accepting applications.');
-        return $this->applications()->create([...$attributes, 'job_id' => $job->id, 'cv_path' => $attributes['cv_path'] ?? $this->cv_path, 'status' => 'submitted', 'submitted_at' => now()]);
+        $application = $this->applications()->create([...$attributes, 'job_id' => $job->id, 'cv_path' => $attributes['cv_path'] ?? $this->cv_path, 'status' => 'submitted', 'submitted_at' => now()]);
+        $employerUser = $job->employer?->user;
+
+        if ($employerUser) {
+            $conversation = Conversation::firstOrCreate(
+                ['application_id' => $application->id],
+                ['created_by' => $this->user_id],
+            );
+            $conversation->participants()->syncWithoutDetaching([$this->user_id, $employerUser->id]);
+        }
+
+        return $application;
     }
 
     public function saveJob(Job $job): SavedJob { return $this->savedJobs()->firstOrCreate(['job_id' => $job->id]); }

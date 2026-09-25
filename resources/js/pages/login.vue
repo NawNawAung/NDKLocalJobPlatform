@@ -19,10 +19,9 @@ function errorFor(field) {
             </div>
 
             <div class="p-6 sm:p-10 lg:p-12">
-                <div class="mb-8 lg:hidden">
-                    <span class="text-sm font-bold tracking-wide text-[var(--brand-primary)]">WELCOME BACK</span>
-                </div>
-                <p class="hidden text-sm font-bold tracking-wide text-[var(--brand-primary)] lg:block">WELCOME BACK</p>
+                <a href="/" class="mb-5 flex justify-center" aria-label="NDK Job Platform home">
+                    <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform logo" class="block h-20 w-20 object-contain sm:h-24 sm:w-24" />
+                </a>
                 <h2 class="mt-2 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Sign in to your account</h2>
                 <p class="mt-2 text-sm text-slate-600">Enter the email and password associated with your account.</p>
 

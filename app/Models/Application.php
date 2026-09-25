@@ -15,6 +15,7 @@ class Application extends Model
     public function job(): BelongsTo { return $this->belongsTo(Job::class); }
     public function jobSeeker(): BelongsTo { return $this->belongsTo(JobSeeker::class); }
     public function interviews(): HasMany { return $this->hasMany(Interview::class); }
+    public function conversation(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(Conversation::class); }
 
     public static function submitApplication(Job $job, JobSeeker $jobSeeker, array $attributes = []): self { return $jobSeeker->applyForJob($job, $attributes); }
     public function withdrawApplication(): bool

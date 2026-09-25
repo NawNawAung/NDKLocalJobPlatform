@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 defineProps({
     isAuthenticated: { type: Boolean, default: false },
@@ -7,7 +7,24 @@ defineProps({
 });
 
 const menuOpen = ref(false);
+const currentHash = ref(window.location.hash);
+const currentPath = ref(window.location.pathname);
+const pageType = window.__AUTH_BOOTSTRAP__?.page;
+const updateCurrentLocation = () => {
+    currentHash.value = window.location.hash;
+    currentPath.value = window.location.pathname;
+};
+onMounted(() => {
+    window.addEventListener('hashchange', updateCurrentLocation);
+    window.addEventListener('popstate', updateCurrentLocation);
+});
+onUnmounted(() => {
+    window.removeEventListener('hashchange', updateCurrentLocation);
+    window.removeEventListener('popstate', updateCurrentLocation);
+});
+
 const links = [
+    { label: 'Home', href: '/' },
     { label: 'Jobs', href: '/#search' },
     { label: 'Salary Insights', href: '/#insights' },
     { label: 'Skills', href: '/#skills-assessment' },
@@ -16,17 +33,27 @@ const links = [
     { label: 'Dashboard', href: '/#dashboard' },
     { label: 'My Profile', href: '/#profile' },
 ];
+
+function isActive(link) {
+    if (link.href === '/') {
+        return currentPath.value === '/' && !currentHash.value && pageType !== 'search';
+    }
+    if (link.href === '/#search' && pageType === 'search' && !currentHash.value) return true;
+    if (link.href === '/#search' && currentHash.value === '#details') return true;
+    if (link.href === '/#dashboard' && currentHash.value === '#post-job') return true;
+    return currentHash.value === link.href.slice(1);
+}
 </script>
 
 <template>
     <header class="site-header sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
         <nav class="mx-auto flex min-h-16 max-w-[1440px] items-center justify-between gap-6 px-5 sm:px-8" aria-label="Main navigation">
-            <a href="/" class="flex h-14 shrink-0 items-center" aria-label="NDK Myanmar home">
-                <img :src="'/images/brand/NDKJobPlatformLogo.jpeg'" alt="NDK Myanmar" class="h-12 w-auto max-w-52 object-contain" />
+            <a href="/" class="flex h-16 shrink-0 items-center" aria-label="NDK Job Platform home">
+                <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform" class="h-16 w-16 object-contain" />
             </a>
 
             <div class="hidden items-center gap-5 xl:flex">
-                <a v-for="link in links" :key="link.href" :href="link.href" class="site-nav-link rounded-md px-2 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-[var(--brand-primary)]">{{ link.label }}</a>
+                <a v-for="link in links" :key="link.href" :href="link.href" :aria-current="isActive(link) ? 'page' : undefined" :class="isActive(link) ? 'bg-blue-50 text-blue-800 ring-1 ring-blue-200 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-[var(--brand-primary)]'" class="site-nav-link rounded-lg px-3 py-2 text-sm font-semibold transition">{{ link.label }}</a>
             </div>
 
             <div class="hidden shrink-0 items-center gap-3 md:flex">
@@ -50,7 +77,7 @@ const links = [
 
         <div v-if="menuOpen" class="border-t border-slate-200 bg-white px-5 py-3 xl:hidden">
             <div class="mx-auto flex max-w-[1440px] flex-col gap-1">
-                <a v-for="link in links" :key="link.href" :href="link.href" class="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50" @click="menuOpen = false">{{ link.label }}</a>
+                <a v-for="link in links" :key="link.href" :href="link.href" :aria-current="isActive(link) ? 'page' : undefined" :class="isActive(link) ? 'bg-blue-50 font-semibold text-blue-800 ring-1 ring-blue-200' : 'font-medium text-slate-700 hover:bg-slate-50'" class="rounded-lg px-3 py-2.5 text-sm" @click="menuOpen = false">{{ link.label }}</a>
                 <template v-if="isAuthenticated">
                     <a href="/#post-job" class="mt-1 rounded-lg bg-[var(--brand-primary)] px-3 py-2.5 text-center text-sm font-semibold text-white" @click="menuOpen = false">Post a Job</a>
                     <form action="/logout" method="post" class="mt-1">
