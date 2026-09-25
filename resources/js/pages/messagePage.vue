@@ -16,6 +16,13 @@ const errorMessage = ref('');
 const successMessage = ref('');
 const conversationLoading = ref(false);
 const listElement = ref(null);
+const userRole = window.__AUTH_BOOTSTRAP__?.role;
+const sidebarMode = ref('inbox');
+const candidateSearch = ref('');
+const candidateApplications = ref([]);
+const candidatesLoading = ref(false);
+const startingConversationId = ref(null);
+let candidateSearchTimer;
 let pollTimer;
 let searchTimer;
 let activeConversationRequest = 0;
@@ -58,6 +65,33 @@ async function loadConversations({ preserveSelection = true } = {}) {
         if (error.response?.status === 401) errorMessage.value = 'Please sign in to view your messages.';
         else errorMessage.value = 'Unable to load conversations. Please try again.';
     }
+}
+
+async function loadCandidates() {
+    if (userRole !== 'employer') return;
+    candidatesLoading.value = true;
+    errorMessage.value = '';
+    try {
+        const { data } = await window.axios.get('/api/employer/candidates', { params: { search: candidateSearch.value.trim() || undefined } });
+        candidateApplications.value = data.applications?.data ?? [];
+    } catch (error) {
+        errorMessage.value = error.response?.status === 403
+            ? 'Candidate discovery is available to employer accounts.'
+            : 'Unable to find applicants right now.';
+    } finally { candidatesLoading.value = false; }
+}
+
+async function startCandidateConversation(application) {
+    startingConversationId.value = application.id;
+    errorMessage.value = '';
+    try {
+        const { data } = await window.axios.post(`/api/applications/${application.id}/conversation`);
+        sidebarMode.value = 'inbox';
+        await loadConversations({ preserveSelection: false });
+        await selectConversation(data.conversation.id);
+    } catch (error) {
+        errorMessage.value = error.response?.data?.message ?? 'Unable to open a conversation with this candidate.';
+    } finally { startingConversationId.value = null; }
 }
 
 async function selectConversation(id) {
@@ -149,11 +183,20 @@ watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => loadConversations({ preserveSelection: false }), 250);
 });
+watch(candidateSearch, () => {
+    clearTimeout(candidateSearchTimer);
+    candidateSearchTimer = setTimeout(loadCandidates, 250);
+});
 
 onMounted(async () => {
     if (!authenticated) return;
     loading.value = true;
     await loadConversations({ preserveSelection: false });
+    const pendingConversationId = window.__pendingConversationId;
+    if (pendingConversationId) {
+        delete window.__pendingConversationId;
+        await selectConversation(Number(pendingConversationId));
+    }
     loading.value = false;
     pollTimer = setInterval(() => {
         loadConversations().then(refreshSelectedMessages);
@@ -163,6 +206,7 @@ onMounted(async () => {
 onUnmounted(() => {
     clearInterval(pollTimer);
     clearTimeout(searchTimer);
+    clearTimeout(candidateSearchTimer);
 });
 </script>
 
@@ -178,12 +222,17 @@ onUnmounted(() => {
                         </div>
                         <span v-if="conversations.reduce((sum, item) => sum + item.unread_count, 0)" class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{{ conversations.reduce((sum, item) => sum + item.unread_count, 0) }} unread</span>
                     </div>
+                    <div v-if="userRole === 'employer'" class="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+                        <button type="button" class="rounded-md px-3 py-2 text-xs font-semibold transition" :class="sidebarMode === 'inbox' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'" @click="sidebarMode = 'inbox'">Inbox</button>
+                        <button type="button" class="rounded-md px-3 py-2 text-xs font-semibold transition" :class="sidebarMode === 'discover' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'" @click="sidebarMode = 'discover'; loadCandidates()">Find applicants</button>
+                    </div>
                     <label class="relative mt-4 block">
-                        <span class="sr-only">Search conversations</span>
+                        <span class="sr-only">{{ sidebarMode === 'discover' ? 'Search your applicants' : 'Search conversations' }}</span>
                         <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                        <input v-model="search" type="search" placeholder="Search people or jobs" class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" />
+                        <input v-if="sidebarMode === 'discover' && userRole === 'employer'" v-model="candidateSearch" type="search" placeholder="Search your applicants" class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" />
+                        <input v-else v-model="search" type="search" placeholder="Search people or jobs" class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" />
                     </label>
-                    <div class="mt-3 flex gap-2" aria-label="Conversation filters">
+                    <div v-if="sidebarMode === 'inbox'" class="mt-3 flex gap-2" aria-label="Conversation filters">
                         <button type="button" class="rounded-full px-3 py-1.5 text-xs font-semibold transition" :class="conversationFilter === 'all' ? 'bg-blue-800 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'" @click="conversationFilter = 'all'">All</button>
                         <button type="button" class="rounded-full px-3 py-1.5 text-xs font-semibold transition" :class="conversationFilter === 'unread' ? 'bg-blue-800 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'" @click="conversationFilter = 'unread'">Unread</button>
                     </div>
@@ -193,6 +242,14 @@ onUnmounted(() => {
                     <h2 class="font-semibold text-blue-950">Sign in to see your inbox</h2>
                     <p class="mt-2 text-sm leading-5 text-blue-900/80">Your conversations with job seekers and employers will appear here.</p>
                     <a href="/login" class="mt-4 inline-flex rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">Sign in</a>
+                </div>
+                <div v-else-if="sidebarMode === 'discover' && userRole === 'employer'" class="flex-1 overflow-y-auto">
+                    <p class="px-5 py-3 text-xs leading-5 text-slate-500">Candidates are people who have applied to your job listings.</p>
+                    <p v-if="candidatesLoading" class="p-5 text-sm text-slate-500">Searching your applicants…</p>
+                    <p v-else-if="candidateApplications.length === 0" class="px-5 py-8 text-center text-sm text-slate-500">No applicants found. Your job applicants will appear here.</p>
+                    <article v-for="application in candidateApplications" :key="application.id" class="border-t border-slate-100 px-4 py-4">
+                        <div class="flex items-start gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-900">{{ application.candidate.name?.slice(0, 1)?.toUpperCase() ?? '?' }}</span><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-900">{{ application.candidate.name }}</p><p class="truncate text-xs text-slate-500">{{ application.candidate.title || 'Job seeker' }}</p><p class="mt-1 truncate text-xs font-medium text-blue-800">{{ application.job_title }}</p><button type="button" :disabled="startingConversationId === application.id" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-60" @click="startCandidateConversation(application)"><i :class="startingConversationId === application.id ? 'ti ti-loader-2 animate-spin' : 'ti ti-message'" aria-hidden="true"/>{{ startingConversationId === application.id ? 'Opening…' : 'Message candidate' }}</button></div></div>
+                    </article>
                 </div>
                 <div v-else-if="loading" class="p-5 text-sm text-slate-500">Loading conversations…</div>
                 <div v-else-if="conversations.length === 0" class="m-5 rounded-xl border border-dashed border-slate-300 p-6 text-center">
