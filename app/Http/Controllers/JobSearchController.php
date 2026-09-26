@@ -29,7 +29,9 @@ class JobSearchController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
+        $employer = $request->user()?->role === 'employer' ? $request->user()->employer : null;
         $jobs = Job::published()
+            ->when($employer, fn (Builder $query) => $query->where('employer_id', '!=', $employer->id))
             ->with(['employer.user', 'township.region'])
             ->when($filters['keyword'] ?? null, function (Builder $query, string $keyword) {
                 $query->where(function (Builder $match) use ($keyword) {

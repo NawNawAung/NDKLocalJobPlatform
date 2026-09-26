@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const regions = bootstrap.regions ?? [];
+const isEmployer = bootstrap.role === 'employer';
 const params = new URLSearchParams(window.location.search);
 const filters = reactive({
     keyword: params.get('keyword') ?? '',
@@ -116,8 +117,8 @@ onMounted(() => loadJobs(page.value));
         <div class="mx-auto max-w-7xl">
             <div class="mb-7">
                 <p class="text-sm font-semibold text-[var(--brand-primary)]">OPPORTUNITIES ACROSS MYANMAR</p>
-                <h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Find your next role</h1>
-                <p class="mt-2 text-sm text-slate-600">Use the filters to narrow the results to the work you want.</p>
+                <h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">{{ isEmployer ? 'Explore the job market' : 'Find your next role' }}</h1>
+                <p class="mt-2 text-sm text-slate-600">{{ isEmployer ? 'Review current listings from other organizations and compare role requirements, locations, and salary ranges.' : 'Use the filters to narrow the results to the work you want.' }}</p>
             </div>
 
             <div class="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -213,9 +214,9 @@ onMounted(() => loadJobs(page.value));
                             <div class="mt-4 flex flex-wrap items-center gap-2">
                                 <span v-if="job.category" class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">{{ job.category }}</span>
                                 <span v-if="job.experience_level" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ formatLabel(job.experience_level) }} experience</span>
-                                <span v-if="job.application_status" class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span>
+                                <span v-if="!isEmployer && job.application_status" class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span>
                                 <span class="ml-auto text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span>
-                                <button type="button" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openJob(job)">{{ job.application_status ? 'View application' : 'View and apply' }}</button>
+                                <button type="button" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openJob(job)">{{ isEmployer ? 'View job details' : job.application_status ? 'View application' : 'View and apply' }}</button>
                             </div>
                         </article>
                     </div>

@@ -45,6 +45,8 @@ class JobApplicationController extends Controller
                 ],
             ],
             'authenticated' => $request->user() !== null,
+            'is_own_listing' => $request->user()?->role === 'employer'
+                && $job->employer?->user_id === $request->user()->id,
             'can_apply' => $seeker?->status === true,
             'has_applied' => $application !== null,
             'application_status' => $application?->status,

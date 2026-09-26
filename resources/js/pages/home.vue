@@ -15,7 +15,9 @@ const advancedFiltersOpen = ref(false);
 const featuredJobs = ref([]);
 const featuredLoading = ref(true);
 const featuredError = ref('');
-const regions = window.__AUTH_BOOTSTRAP__?.regions ?? [];
+const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
+const isEmployer = bootstrap.role === 'employer';
+const regions = bootstrap.regions ?? [];
 const townships = computed(() => regions.find((region) => String(region.id) === regionId.value)?.townships ?? []);
 
 function submitSearch() {
@@ -96,8 +98,8 @@ onMounted(async () => {
       <div class="bg-white min-h-screen">
         <div class="bg-gradient-to-br from-blue-50 via-white to-slate-100 px-5 py-16 sm:px-8 sm:py-20">
           <div class="mx-auto max-w-5xl text-center">
-            <div class="mb-3 text-4xl font-extrabold tracking-tight text-[var(--brand-ink)] leading-tight sm:text-5xl">Find Your Next Opportunity in Myanmar</div>
-            <div class="mx-auto mb-8 max-w-2xl text-base leading-6 text-slate-600">Search open roles by title, location, experience, work arrangement, and salary.</div>
+            <div class="mb-3 text-4xl font-extrabold tracking-tight text-[var(--brand-ink)] leading-tight sm:text-5xl">{{ isEmployer ? 'Explore Myanmar’s Job Market' : 'Find Your Next Opportunity in Myanmar' }}</div>
+            <div class="mx-auto mb-8 max-w-2xl text-base leading-6 text-slate-600">{{ isEmployer ? 'Review public listings from other employers to understand current roles, locations, and compensation.' : 'Search open roles by title, location, experience, work arrangement, and salary.' }}</div>
             <form class="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-lg shadow-blue-900/5 sm:p-6" @submit.prevent="submitSearch">
               <div class="grid gap-4 md:grid-cols-[1.25fr_1fr_1fr_auto]">
                 <label class="block">
@@ -250,7 +252,7 @@ onMounted(async () => {
         </div>
         <div class="px-20 pb-16 max-sm:px-4 max-sm:pb-10">
           <div class="flex justify-between items-center mb-6">
-            <div class="text-2xl font-bold leading-8 text-gray-900">Recommended For You</div>
+            <div class="text-2xl font-bold leading-8 text-gray-900">{{ isEmployer ? 'Recently published by other employers' : 'Recommended For You' }}</div>
             <a href="#search" class="flex gap-1.5 items-center">
               <span class="text-sm font-medium text-blue-500">View All Jobs</span>
               <i class="ti ti-arrow-right text-base text-blue-500" />
@@ -262,10 +264,10 @@ onMounted(async () => {
             <article v-for="job in featuredJobs" :key="job.id" class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-blue-200 hover:shadow-sm">
               <div class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-blue-50 text-lg font-bold text-blue-900">{{ job.company?.slice(0, 2)?.toUpperCase() || 'CO' }}</div>
               <div class="min-w-0 flex-1">
-                <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
+                <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="!isEmployer && job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
                 <div class="flex flex-wrap items-center gap-2 text-sm"><span class="font-medium text-blue-800">{{ job.company }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ job.location }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ formatSalary(job) }}</span></div>
               </div>
-              <div class="flex shrink-0 items-center gap-3"><span class="text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span><a :href="`/#details?job=${job.id}`" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ job.application_status ? 'View application' : 'View and apply' }}</a></div>
+              <div class="flex shrink-0 items-center gap-3"><span class="text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span><a :href="`/#details?job=${job.id}`" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ isEmployer ? 'View job details' : job.application_status ? 'View application' : 'View and apply' }}</a></div>
             </article>
           </div>
           <div v-else class="rounded-xl border border-dashed border-slate-300 p-8 text-center"><p class="text-sm text-slate-600">There are no published jobs yet.</p><a href="/jobs" class="mt-3 inline-flex font-semibold text-[var(--brand-primary)] hover:underline">Browse jobs</a></div>
