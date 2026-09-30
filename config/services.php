@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'billing' => [
+        'bank_name' => env('BILLING_BANK_NAME'),
+        'account_name' => env('BILLING_ACCOUNT_NAME'),
+        'account_number' => env('BILLING_ACCOUNT_NUMBER'),
+        'payment_note' => env('BILLING_PAYMENT_NOTE', 'Include your NDK order number in the transfer note.'),
+    ],
+
 ];

@@ -12,6 +12,9 @@ import MessagePage from './pages/messagePage.vue';
 import SkillsAssessment from './pages/skillsAccessment.vue';
 import LoginPage from './pages/login.vue';
 import RegisterPage from './pages/register.vue';
+import BillingCenter from './pages/BillingCenter.vue';
+import AdminBilling from './pages/AdminBilling.vue';
+import TalentSearch from './pages/TalentSearch.vue';
 import SiteHeader from './components/SiteHeader.vue';
 import SiteFooter from './components/SiteFooter.vue';
 
@@ -24,6 +27,9 @@ const pages = {
     '#insights': InsightPage,
     '#messages': MessagePage,
     '#skills-assessment': SkillsAssessment,
+    '#billing': BillingCenter,
+    '#admin-billing': AdminBilling,
+    '#talent': TalentSearch,
 };
 
 const currentHash = ref(window.location.hash);
@@ -41,10 +47,12 @@ createApp({
             if (authBootstrap.authPage === 'register') return RegisterPage;
             if (authBootstrap.page === 'profile') return JobSeekerProfile;
             if (authBootstrap.page === 'search' && !currentHash.value) return JobSearch;
-            const employerPages = ['#post-job', '#pipeline', '#dashboard'];
+            const employerPages = ['#post-job', '#pipeline', '#dashboard', '#billing', '#talent'];
             const jobSeekerPages = ['#skills-assessment'];
+            const adminPages = ['#admin-billing'];
             if (employerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'employer') return Home;
             if (jobSeekerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'job_seeker') return Home;
+            if (adminPages.includes(currentRouteHash.value) && authBootstrap.role !== 'admin') return Home;
             if (currentRouteHash.value === '#messages' && !authBootstrap.authenticated) return Home;
             return pages[currentRouteHash.value] ?? Home;
         });

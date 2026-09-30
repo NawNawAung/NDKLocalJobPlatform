@@ -7,6 +7,7 @@ use App\Models\Interview;
 use App\Models\Job;
 use App\Models\Notification;
 use App\Models\JobSeeker;
+use App\Services\EmployerEntitlementService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Storage;
 
 class EmployerWorkspaceController extends Controller
 {
+    public function __construct(private readonly EmployerEntitlementService $entitlements) {}
+
     private function employer(Request $request)
     {
         abort_unless($request->user()->role === 'employer' && $request->user()->employer, 403);
@@ -35,6 +38,12 @@ class EmployerWorkspaceController extends Controller
             ->latest('submitted_at')->limit(6)->get();
 
         return response()->json([
+            'billing' => [
+                'plan_name' => $this->entitlements->currentPlan($employer)?->name ?? 'Free',
+                'active_job_limit' => (int) $this->entitlements->value($employer, 'max_active_jobs', 1),
+                'candidate_cv_limit' => (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0),
+                'candidate_cv_used' => $this->entitlements->usage($employer, 'candidate_cv_downloads'),
+            ],
             'profile' => [
                 'name' => $request->user()->name,
                 'email' => $request->user()->email,
@@ -148,6 +157,13 @@ class EmployerWorkspaceController extends Controller
         if (isset($data['salary_min'], $data['salary_max']) && $data['salary_min'] > $data['salary_max']) {
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }
+        $jobLimit = (int) $this->entitlements->value($employer, 'max_active_jobs', 1);
+        if ($jobLimit >= 0 && $employer->jobs()->where('status', 'published')->count() >= $jobLimit) {
+            return response()->json([
+                'message' => "Your current plan allows {$jobLimit} active job listing(s). Upgrade your plan or close an active listing to publish another job.",
+                'upgrade_required' => true,
+            ], 402);
+        }
         $job = $employer->postJob([...$data, 'status' => 'published', 'posted_at' => now(), 'salary_currency' => 'MMK']);
         $this->notifyJobAlertSubscribers($job);
         return response()->json(['message' => 'Job published.', 'job' => $job], 201);
@@ -201,6 +217,9 @@ class EmployerWorkspaceController extends Controller
         abort_unless($application->job()->where('employer_id', $employer->id)->exists(), 404);
         $path = $application->cv_path ?: $application->jobSeeker?->cv_path;
         abort_unless($path && Storage::disk('local')->exists($path), 404);
+        $limit = (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0);
+        abort_if($this->entitlements->remaining($employer, 'candidate_cv_downloads', $limit) === 0, 403, 'Your plan has reached its monthly candidate CV download limit. Upgrade your plan to continue.');
+        $this->entitlements->record($employer, 'candidate_cv_downloads', 1, 'application', $application->id);
         return Storage::disk('local')->download($path, basename($path));
     }
 

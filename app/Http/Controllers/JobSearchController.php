@@ -32,7 +32,8 @@ class JobSearchController extends Controller
         $employer = $request->user()?->role === 'employer' ? $request->user()->employer : null;
         $jobs = Job::published()
             ->when($employer, fn (Builder $query) => $query->where('employer_id', '!=', $employer->id))
-            ->with(['employer.user', 'township.region'])
+            ->with(['employer.user', 'township.region', 'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())])
+            ->withCount(['promotions as active_featured_promotions_count' => fn ($query) => $query->where('promotion_type', 'featured')->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now())])
             ->when($filters['keyword'] ?? null, function (Builder $query, string $keyword) {
                 $query->where(function (Builder $match) use ($keyword) {
                     $match->where('title', 'like', "%{$keyword}%")
@@ -74,6 +75,7 @@ class JobSearchController extends Controller
                 $query->where('posted_at', '>=', $cutoff);
             });
 
+        $jobs->orderByDesc('active_featured_promotions_count');
         match ($filters['sort'] ?? 'latest') {
             'salary_high' => $jobs->orderByDesc('salary_max')->orderByDesc('posted_at'),
             'salary_low' => $jobs->orderBy('salary_min')->orderByDesc('posted_at'),
@@ -106,6 +108,8 @@ class JobSearchController extends Controller
                 'salary_currency' => $job->salary_currency,
                 'posted_at' => $job->posted_at?->toIso8601String(),
                 'application_status' => $applicationStatuses->get($job->id),
+                'is_featured' => $job->promotions->contains('promotion_type', 'featured'),
+                'promotion_labels' => $job->promotions->pluck('promotion_type')->unique()->values(),
             ]),
             'meta' => [
                 'current_page' => $results->currentPage(),

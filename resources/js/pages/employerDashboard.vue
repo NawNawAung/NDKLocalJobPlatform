@@ -101,6 +101,8 @@ onMounted(loadDashboard);
                     </article>
                 </div>
 
+                <section class="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-blue-100 bg-white p-5 shadow-sm"><div><p class="text-xs font-bold uppercase tracking-wide text-blue-700">{{ dashboard.billing?.plan_name || 'Free' }} plan</p><h2 class="mt-1 font-semibold text-slate-950">{{ dashboard.billing?.active_job_limit < 0 ? 'Unlimited' : dashboard.billing?.active_job_limit }} active job slots · {{ dashboard.billing?.candidate_cv_limit < 0 ? 'Unlimited' : dashboard.billing?.candidate_cv_limit ?? 0 }} candidate CV downloads per month</h2><p class="mt-1 text-sm text-slate-600">Review plan limits, invoices, and one-time job promotions.</p></div><div class="flex gap-2"><a href="/#talent" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Search talent</a><a href="/#billing" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">Plans &amp; billing</a></div></section>
+
                 <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.8fr)]">
                     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">

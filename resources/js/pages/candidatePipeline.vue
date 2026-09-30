@@ -4,6 +4,7 @@ import InterviewSchedulerModal from '../components/modal.vue';
 
 const loading = ref(true);
 const error = ref('');
+const upgradeRequired = ref(false);
 const notice = ref('');
 const applications = ref([]);
 const jobs = ref([]);
@@ -13,6 +14,7 @@ const statusFilter = ref('');
 const scheduleFor = ref(null);
 const scheduleSaving = ref(false);
 const scheduleError = ref('');
+const downloadingApplication = ref(null);
 const statuses = ['submitted', 'reviewing', 'shortlisted', 'interview', 'offered', 'hired', 'rejected'];
 const updateStatuses = statuses.filter((status) => status !== 'submitted');
 let searchTimer;
@@ -67,6 +69,28 @@ function openScheduler(application) {
     scheduleFor.value = application;
 }
 
+async function downloadCandidateCv(application) {
+    error.value = '';
+    upgradeRequired.value = false;
+    downloadingApplication.value = application.id;
+    try {
+        const { data, headers } = await window.axios.get(`/api/employer/applications/${application.id}/resume`, { responseType: 'blob' });
+        const blobUrl = URL.createObjectURL(data);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = application.candidate.cv_name || `${application.candidate.name || 'candidate'}-cv`;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+    } catch (exception) {
+        let message = exception.response?.data?.message;
+        if (!message && exception.response?.data instanceof Blob) {
+            try { message = JSON.parse(await exception.response.data.text()).message; } catch { /* The response was not a JSON error. */ }
+        }
+        upgradeRequired.value = exception.response?.status === 403;
+        error.value = message ?? 'Could not download this CV.';
+    } finally { downloadingApplication.value = null; }
+}
+
 watch([jobFilter, statusFilter], loadCandidates);
 watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadCandidates, 250); });
 onMounted(loadCandidates);
@@ -76,7 +100,7 @@ onMounted(loadCandidates);
     <section class="min-h-[70vh] bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-7xl">
             <div class="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold text-[var(--brand-primary)]">Recruiting</p><h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Candidate pipeline</h1><p class="mt-2 text-sm text-slate-600">Review applicants to your job listings, update their stage, and contact them.</p></div><span class="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-900">{{ countLabel }}</span></div>
-            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }}</p><p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
+            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }} <a v-if="upgradeRequired" href="/#billing" class="ml-1 font-semibold underline">View plans</a></p><p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
             <div class="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[minmax(220px,1fr)_220px_190px]"><label class="relative"><span class="sr-only">Search applicants</span><i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"/><input v-model="search" type="search" placeholder="Search name or job title" class="filter-field !pl-9"></label><label><span class="sr-only">Filter by job</span><select v-model="jobFilter" class="filter-field"><option value="">All your jobs</option><option v-for="job in jobs" :key="job.id" :value="String(job.id)">{{ job.title }}</option></select></label><label><span class="sr-only">Filter by stage</span><select v-model="statusFilter" class="filter-field"><option value="">All stages</option><option v-for="status in statuses" :key="status" :value="status">{{ status.replaceAll('_', ' ') }}</option></select></label></div>
 
             <div v-if="loading" class="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Loading applicants…</div>
@@ -84,7 +108,7 @@ onMounted(loadCandidates);
                 <article v-for="application in applications" :key="application.id" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex flex-wrap items-start justify-between gap-4"><div class="flex min-w-0 gap-3"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-100 text-lg font-bold text-blue-900">{{ application.candidate.name?.slice(0, 1)?.toUpperCase() || '?' }}</span><div class="min-w-0"><h2 class="truncate text-lg font-bold text-slate-900">{{ application.candidate.name }}</h2><p class="mt-0.5 text-sm text-slate-700">{{ application.candidate.title || 'Professional title not provided' }}</p><p class="mt-1 text-xs text-slate-500">{{ application.job_title }} · {{ application.candidate.location || 'Location not provided' }}<span v-if="application.candidate.experience !== null"> · {{ application.candidate.experience }} years experience</span></p><p class="mt-1 text-xs text-slate-500">Applied {{ application.submitted_at ? new Date(application.submitted_at).toLocaleDateString() : '—' }}</p></div></div><label class="text-xs font-semibold text-slate-500">Application stage<select :value="application.status" class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold capitalize text-slate-800" @change="updateStatus(application, $event.target.value)"><option v-for="status in updateStatuses" :key="status" :value="status">{{ status.replaceAll('_', ' ') }}</option></select></label></div>
                     <div v-if="application.candidate.skills?.length" class="mt-4 flex flex-wrap gap-2"><span v-for="skill in application.candidate.skills" :key="skill" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{{ skill }}</span></div><p v-if="application.cover_letter" class="mt-4 whitespace-pre-line rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{{ application.cover_letter }}</p>
-                    <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><a v-if="application.candidate.has_cv" :href="`/api/employer/applications/${application.id}/resume`" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="ti ti-download" aria-hidden="true"/>Download CV</a><span v-else class="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500"><i class="ti ti-file-off" aria-hidden="true"/>No CV provided</span><button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" @click="messageCandidate(application)"><i class="ti ti-message" aria-hidden="true"/>Message candidate</button><button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openScheduler(application)"><i class="ti ti-calendar-plus" aria-hidden="true"/>Schedule interview</button></div>
+                    <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button v-if="application.candidate.has_cv" type="button" :disabled="downloadingApplication === application.id" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" @click="downloadCandidateCv(application)"><i :class="downloadingApplication === application.id ? 'ti ti-loader-2 animate-spin' : 'ti ti-download'" aria-hidden="true"/>{{ downloadingApplication === application.id ? 'Downloading…' : 'Download CV' }}</button><span v-else class="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500"><i class="ti ti-file-off" aria-hidden="true"/>No CV provided</span><button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" @click="messageCandidate(application)"><i class="ti ti-message" aria-hidden="true"/>Message candidate</button><button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]" @click="openScheduler(application)"><i class="ti ti-calendar-plus" aria-hidden="true"/>Schedule interview</button></div>
                 </article>
             </div>
             <div v-else class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center"><i class="ti ti-users mx-auto text-4xl text-slate-300" aria-hidden="true"/><h2 class="mt-3 font-semibold text-slate-800">No matching applicants</h2><p class="mt-1 text-sm text-slate-500">Applications to your job listings will appear here.</p><a href="/#post-job" class="mt-4 inline-flex rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white">Post a job</a></div>

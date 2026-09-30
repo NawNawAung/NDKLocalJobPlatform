@@ -205,6 +205,7 @@ onMounted(() => loadJobs(page.value));
                                 <div class="min-w-0">
                                     <p class="text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)]">{{ job.company }}</p>
                                     <h2 class="mt-1 text-lg font-bold text-[var(--brand-ink)]">{{ job.title }}</h2>
+                                    <span v-if="job.is_featured" class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900"><i class="ti ti-star-filled" aria-hidden="true"/>Featured</span>
                                     <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
                                         <span>{{ job.location }}</span><span aria-hidden="true">·</span><span>{{ formatLabel(job.employment_type) }}</span><span v-if="job.work_mode" aria-hidden="true">·</span><span v-if="job.work_mode">{{ formatLabel(job.work_mode) }}</span>
                                     </p>

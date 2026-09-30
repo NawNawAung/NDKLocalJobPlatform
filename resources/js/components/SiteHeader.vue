@@ -37,9 +37,12 @@ const links = [
         { label: 'My Profile', href: '/profile' },
     ] : []),
     ...(props.isAuthenticated && props.userRole === 'employer' ? [
+        { label: 'Talent', href: '/#talent' },
         { label: 'Candidates', href: '/#pipeline' },
         { label: 'Dashboard', href: '/#dashboard' },
+        { label: 'Billing', href: '/#billing' },
     ] : []),
+    ...(props.isAuthenticated && props.userRole === 'admin' ? [{ label: 'Billing review', href: '/#admin-billing' }] : []),
     ...(props.isAuthenticated ? [{ label: 'Messages', href: '/#messages' }] : []),
 ];
 

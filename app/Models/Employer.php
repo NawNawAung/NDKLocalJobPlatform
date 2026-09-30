@@ -16,6 +16,10 @@ class Employer extends Model
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function jobs(): HasMany { return $this->hasMany(Job::class); }
     public function interviews(): HasMany { return $this->hasMany(Interview::class); }
+    public function subscriptions(): HasMany { return $this->hasMany(Subscription::class); }
+    public function orders(): HasMany { return $this->hasMany(Order::class); }
+    public function featureUsages(): HasMany { return $this->hasMany(FeatureUsage::class); }
+    public function jobPromotions(): HasMany { return $this->hasMany(JobPromotion::class); }
 
     public function postJob(array $attributes): Job { return $this->jobs()->create($attributes); }
 

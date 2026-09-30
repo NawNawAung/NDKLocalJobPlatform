@@ -15,7 +15,7 @@ class JobApplicationController extends Controller
 {
     public function show(Request $request, int $jobId): JsonResponse
     {
-        $job = Job::published()->with(['employer.region:id,name', 'employer.township:id,name', 'township.region:id,name'])
+        $job = Job::published()->with(['employer.region:id,name', 'employer.township:id,name', 'township.region:id,name', 'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())])
             ->findOrFail($jobId);
         $seeker = $request->user()?->role === 'job_seeker' ? $request->user()->jobSeeker : null;
         $application = $seeker?->applications()->where('job_id', $job->id)->first();
@@ -37,6 +37,8 @@ class JobApplicationController extends Controller
                 'salary_currency' => $job->salary_currency,
                 'posted_at' => $job->posted_at?->toIso8601String(),
                 'application_deadline' => $job->application_deadline?->toIso8601String(),
+                'is_featured' => $job->promotions->contains('promotion_type', 'featured'),
+                'promotion_labels' => $job->promotions->pluck('promotion_type')->unique()->values(),
                 'company' => [
                     'name' => $job->employer?->company_name,
                     'description' => $job->employer?->company_description,

@@ -7,6 +7,7 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\EmployerWorkspaceController;
 use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\BillingController;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
@@ -27,6 +28,16 @@ Route::middleware('auth')->prefix('api')->group(function () {
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::get('/employer/billing', [BillingController::class, 'overview'])->name('employer.billing');
+    Route::post('/employer/billing/orders', [BillingController::class, 'createOrder'])->middleware('throttle:10,1')->name('employer.billing.orders.store');
+    Route::post('/employer/billing/orders/{order}/payments', [BillingController::class, 'submitPayment'])->middleware('throttle:5,1')->name('employer.billing.payments.store');
+    Route::get('/billing/invoices/{invoice}', [BillingController::class, 'invoice'])->name('billing.invoices.show');
+    Route::get('/admin/billing/payments', [BillingController::class, 'adminPayments'])->name('admin.billing.payments');
+    Route::get('/admin/billing/payments/{payment}/proof', [BillingController::class, 'paymentProof'])->name('admin.billing.payments.proof');
+    Route::patch('/admin/billing/payments/{payment}/review', [BillingController::class, 'reviewPayment'])->name('admin.billing.payments.review');
+    Route::post('/admin/billing/payments/{payment}/refunds', [BillingController::class, 'recordRefund'])->name('admin.billing.payments.refunds.store');
+    Route::get('/employer/talent', [BillingController::class, 'talent'])->name('employer.talent');
+    Route::get('/employer/talent/{jobSeekerId}/resume', [BillingController::class, 'downloadTalentResume'])->whereNumber('jobSeekerId')->name('employer.talent.resume');
     Route::post('/jobs/{jobId}/applications', [JobApplicationController::class, 'apply'])->whereNumber('jobId')->middleware('throttle:10,1')->name('applications.store');
     Route::post('/jobs/{jobId}/save', [JobApplicationController::class, 'save'])->whereNumber('jobId')->name('jobs.save');
     Route::delete('/jobs/{jobId}/save', [JobApplicationController::class, 'unsave'])->whereNumber('jobId')->name('jobs.unsave');

@@ -4,6 +4,7 @@ import { reactive, ref } from 'vue';
 const saving = ref(false);
 const error = ref('');
 const notice = ref('');
+const upgradeRequired = ref(false);
 const jobDraft = window.__employerJobDraft ?? null;
 const editingId = ref(jobDraft?.id ?? null);
 const form = reactive({
@@ -23,6 +24,7 @@ async function publishJob() {
     saving.value = true;
     error.value = '';
     notice.value = '';
+    upgradeRequired.value = false;
     const payload = { ...form };
     for (const key of ['salary_min', 'salary_max']) payload[key] = payload[key] === '' ? null : Number(payload[key]);
     for (const key of ['experience_level', 'application_deadline', 'requirements']) if (!payload[key]) payload[key] = null;
@@ -34,6 +36,7 @@ async function publishJob() {
         delete window.__employerJobDraft;
         window.location.hash = 'dashboard';
     } catch (exception) {
+        upgradeRequired.value = Boolean(exception.response?.data?.upgrade_required || exception.response?.status === 402);
         error.value = exception.response?.data?.errors
             ? Object.values(exception.response.data.errors).flat().join(' ')
             : exception.response?.data?.message ?? 'Could not publish this job. Please check the fields and try again.';
@@ -47,6 +50,7 @@ async function publishJob() {
             <div class="mb-6"><a href="/#dashboard" class="inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand-primary)] hover:underline"><i class="ti ti-arrow-left" aria-hidden="true" /> Employer dashboard</a><p class="mt-5 text-sm font-semibold text-[var(--brand-primary)]">Hiring</p><h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">{{ editingId ? 'Edit job listing' : 'Post a job' }}</h1><p class="mt-2 text-sm leading-6 text-slate-600">Share a clear description and requirements. Your published listing will be visible in job search.</p></div>
             <form class="space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8" @submit.prevent="publishJob">
                 <p v-if="error" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }}</p>
+                <div v-if="upgradeRequired" class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950"><p class="font-semibold">Your plan has reached its active job limit.</p><a href="/#billing" class="mt-2 inline-flex font-semibold text-blue-800 underline">View plans and billing</a></div>
                 <p v-if="notice" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
                 <div class="grid gap-5 sm:grid-cols-2">
                     <label class="sm:col-span-2"><span class="form-label">Job title <b class="text-red-600">*</b></span><input v-model="form.title" required maxlength="255" placeholder="e.g. Senior Frontend Developer" class="form-field"></label>

@@ -22,6 +22,7 @@ class Job extends Model
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function applications(): HasMany { return $this->hasMany(Application::class); }
     public function savedBy(): HasMany { return $this->hasMany(SavedJob::class); }
+    public function promotions(): HasMany { return $this->hasMany(JobPromotion::class); }
 
     public static function createJob(Employer $employer, array $attributes): self
     {
