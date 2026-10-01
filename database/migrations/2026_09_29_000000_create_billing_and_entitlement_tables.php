@@ -8,11 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('job_seekers', function (Blueprint $table) {
-            $table->boolean('profile_searchable')->default(false)->after('job_alerts_enabled');
-        });
+        // This preference may already exist in databases where it was added
+        // manually or by an earlier local migration attempt.
+        if (! Schema::hasColumn('job_seekers', 'profile_searchable')) {
+            Schema::table('job_seekers', function (Blueprint $table) {
+                $table->boolean('profile_searchable')->default(false)->after('job_alerts_enabled');
+            });
+        }
 
-        Schema::create('pricing_plans', function (Blueprint $table) {
+        $this->createIfMissing('pricing_plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
@@ -28,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('billing_products', function (Blueprint $table) {
+        $this->createIfMissing('billing_products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
@@ -43,7 +47,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('plan_features', function (Blueprint $table) {
+        $this->createIfMissing('plan_features', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pricing_plan_id')->constrained()->cascadeOnDelete();
             $table->string('feature_key', 80);
@@ -52,7 +56,7 @@ return new class extends Migration
             $table->unique(['pricing_plan_id', 'feature_key']);
         });
 
-        Schema::create('subscriptions', function (Blueprint $table) {
+        $this->createIfMissing('subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employer_id')->constrained()->cascadeOnDelete();
             $table->foreignId('pricing_plan_id')->constrained()->restrictOnDelete();
@@ -67,7 +71,7 @@ return new class extends Migration
             $table->index(['employer_id', 'status']);
         });
 
-        Schema::create('orders', function (Blueprint $table) {
+        $this->createIfMissing('orders', function (Blueprint $table) {
             $table->id();
             $table->string('order_number', 40)->unique();
             $table->foreignId('user_id')->constrained()->restrictOnDelete();
@@ -84,7 +88,7 @@ return new class extends Migration
             $table->index(['user_id', 'created_at']);
         });
 
-        Schema::create('order_items', function (Blueprint $table) {
+        $this->createIfMissing('order_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('pricing_plan_id')->nullable()->constrained()->nullOnDelete();
@@ -99,7 +103,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('subscription_items', function (Blueprint $table) {
+        $this->createIfMissing('subscription_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subscription_id')->constrained()->cascadeOnDelete();
             $table->foreignId('order_item_id')->nullable()->constrained()->nullOnDelete();
@@ -112,7 +116,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('payments', function (Blueprint $table) {
+        $this->createIfMissing('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->restrictOnDelete();
@@ -133,7 +137,7 @@ return new class extends Migration
             $table->index(['order_id', 'created_at']);
         });
 
-        Schema::create('invoices', function (Blueprint $table) {
+        $this->createIfMissing('invoices', function (Blueprint $table) {
             $table->id();
             $table->string('invoice_number', 40)->unique();
             $table->foreignId('order_id')->unique()->constrained()->restrictOnDelete();
@@ -150,7 +154,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('refunds', function (Blueprint $table) {
+        $this->createIfMissing('refunds', function (Blueprint $table) {
             $table->id();
             $table->foreignId('payment_id')->constrained()->cascadeOnDelete();
             $table->foreignId('processed_by')->nullable()->constrained('users')->nullOnDelete();
@@ -163,7 +167,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('feature_usages', function (Blueprint $table) {
+        $this->createIfMissing('feature_usages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employer_id')->constrained()->cascadeOnDelete();
             $table->string('feature_key', 80)->index();
@@ -177,7 +181,7 @@ return new class extends Migration
             $table->index(['employer_id', 'feature_key', 'period_start']);
         });
 
-        Schema::create('promotions', function (Blueprint $table) {
+        $this->createIfMissing('promotions', function (Blueprint $table) {
             $table->id();
             $table->string('code', 40)->unique();
             $table->string('discount_type', 16);
@@ -191,7 +195,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('promotion_redemptions', function (Blueprint $table) {
+        $this->createIfMissing('promotion_redemptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('promotion_id')->constrained()->restrictOnDelete();
             $table->foreignId('order_id')->unique()->constrained()->cascadeOnDelete();
@@ -202,7 +206,7 @@ return new class extends Migration
             $table->unique(['promotion_id', 'user_id']);
         });
 
-        Schema::create('job_promotions', function (Blueprint $table) {
+        $this->createIfMissing('job_promotions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('job_id')->constrained('job_listings')->cascadeOnDelete();
             $table->foreignId('employer_id')->constrained()->cascadeOnDelete();
@@ -210,7 +214,9 @@ return new class extends Migration
             $table->string('promotion_type', 32)->index();
             $table->string('status', 24)->default('scheduled')->index();
             $table->timestamp('starts_at')->nullable();
-            $table->timestamp('ends_at')->index();
+            // DATETIME avoids legacy MySQL TIMESTAMP implicit-default rules;
+            // the application always supplies the promotion end time.
+            $table->dateTime('ends_at')->index();
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->index(['job_id', 'status', 'ends_at']);
@@ -219,22 +225,16 @@ return new class extends Migration
 
     public function down(): void
     {
+        // These tables and the profile preference column were already present
+        // before this pending migration was applied in the current database.
+        // Only this migration's missing table should be removed on rollback.
         Schema::dropIfExists('job_promotions');
-        Schema::dropIfExists('promotion_redemptions');
-        Schema::dropIfExists('promotions');
-        Schema::dropIfExists('feature_usages');
-        Schema::dropIfExists('refunds');
-        Schema::dropIfExists('invoices');
-        Schema::dropIfExists('payments');
-        Schema::dropIfExists('subscription_items');
-        Schema::dropIfExists('order_items');
-        Schema::dropIfExists('orders');
-        Schema::dropIfExists('subscriptions');
-        Schema::dropIfExists('plan_features');
-        Schema::dropIfExists('billing_products');
-        Schema::dropIfExists('pricing_plans');
-        Schema::table('job_seekers', function (Blueprint $table) {
-            $table->dropColumn('profile_searchable');
-        });
+    }
+
+    private function createIfMissing(string $tableName, \Closure $definition): void
+    {
+        if (! Schema::hasTable($tableName)) {
+            Schema::create($tableName, $definition);
+        }
     }
 };

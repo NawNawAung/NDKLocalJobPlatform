@@ -64,7 +64,7 @@ class BillingController extends Controller
                 'subscription_ends_at' => $subscription?->ends_at?->toIso8601String(),
             ] : null,
             'usage' => [
-                'active_jobs' => $employer->jobs()->where('status', 'published')->count(),
+                'active_jobs' => Job::published()->where('employer_id', $employer->id)->count(),
                 'active_jobs_limit' => $jobLimit,
                 'candidate_cv_downloads' => $this->entitlements->usage($employer, 'candidate_cv_downloads'),
                 'candidate_cv_downloads_limit' => $cvLimit,
@@ -436,6 +436,8 @@ class BillingController extends Controller
                 'location' => collect([$candidate->township?->name, $candidate->region?->name])->filter()->join(', '),
                 'has_cv' => filled($candidate->cv_path),
                 'cv_url' => $canDownload && filled($candidate->cv_path) ? "/api/employer/talent/{$candidate->id}/resume" : null,
+                'portfolio_url' => $canViewContact ? $candidate->portfolio_url : null,
+                'social_links' => $canViewContact ? ($candidate->social_links ?? []) : [],
                 'employment_type' => $candidate->employment_type,
                 'work_mode' => $candidate->work_mode,
             ]),

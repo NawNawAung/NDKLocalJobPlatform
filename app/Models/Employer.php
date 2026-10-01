@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Employer extends Model
 {
-    protected $fillable = ['user_id', 'region_id', 'township_id', 'company_name', 'company_description', 'location', 'is_verified'];
-    protected function casts(): array { return ['is_verified' => 'boolean']; }
+    protected $fillable = ['user_id', 'region_id', 'township_id', 'company_name', 'company_description', 'location', 'website_url', 'social_links', 'is_verified'];
+    protected function casts(): array { return ['is_verified' => 'boolean', 'social_links' => 'array']; }
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function region(): BelongsTo { return $this->belongsTo(Region::class); }

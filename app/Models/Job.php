@@ -31,7 +31,7 @@ class Job extends Model
 
     public function scopePublished(Builder $query): Builder
     {
-        return $query->where('status', 'published')->where(fn (Builder $q) => $q->whereNull('application_deadline')->orWhere('application_deadline', '>=', now()));
+        return $query->where('status', 'published')->where(fn (Builder $q) => $q->whereNull('application_deadline')->orWhereDate('application_deadline', '>=', today()));
     }
 
     public function updateJob(array $attributes): bool { return $this->update($attributes); }

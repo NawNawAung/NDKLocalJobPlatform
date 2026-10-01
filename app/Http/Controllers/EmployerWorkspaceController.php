@@ -50,12 +50,14 @@ class EmployerWorkspaceController extends Controller
                 'company_name' => $employer->company_name,
                 'company_description' => $employer->company_description,
                 'location' => $employer->location,
+                'website_url' => $employer->website_url,
+                'social_links' => $employer->social_links ?? [],
                 'region' => $employer->region?->name,
                 'township' => $employer->township?->name,
                 'is_verified' => $employer->is_verified,
             ],
             'stats' => [
-                'active_jobs' => $jobs->where('status', 'published')->count(),
+                'active_jobs' => Job::published()->where('employer_id', $employer->id)->count(),
                 'total_applications' => (clone $applications)->whereNotIn('status', ['withdrawn'])->count(),
                 'in_review' => (clone $applications)->whereIn('status', ['submitted', 'reviewing', 'shortlisted'])->count(),
                 'interviews_upcoming' => Interview::where('employer_id', $employer->id)->where('status', 'scheduled')->where('interview_at', '>=', now())->count(),
@@ -68,6 +70,7 @@ class EmployerWorkspaceController extends Controller
                 'experience_level' => $job->experience_level, 'work_mode' => $job->work_mode,
                 'salary_min' => $job->salary_min, 'salary_max' => $job->salary_max,
                 'application_deadline' => $job->application_deadline?->format('Y-m-d'),
+                'is_expired' => $job->application_deadline?->isBefore(today()) ?? false,
                 'description' => $job->description, 'requirements' => $job->requirements,
             ]),
             'recent_applicants' => $recentApplicants->map(fn (Application $application) => [
@@ -94,9 +97,17 @@ class EmployerWorkspaceController extends Controller
             'company_name' => ['required', 'string', 'max:255'],
             'company_description' => ['nullable', 'string', 'max:5000'],
             'location' => ['nullable', 'string', 'max:255'],
+            'website_url' => ['nullable', 'url:http,https', 'max:2048'],
+            'social_links' => ['nullable', 'array:linkedin,github,facebook,instagram,x'],
+            'social_links.linkedin' => ['nullable', 'url:http,https', 'max:2048'],
+            'social_links.github' => ['nullable', 'url:http,https', 'max:2048'],
+            'social_links.facebook' => ['nullable', 'url:http,https', 'max:2048'],
+            'social_links.instagram' => ['nullable', 'url:http,https', 'max:2048'],
+            'social_links.x' => ['nullable', 'url:http,https', 'max:2048'],
         ]);
         $request->user()->update(['name' => $data['name'], 'email' => $data['email']]);
-        $employer->update(collect($data)->only(['company_name', 'company_description', 'location'])->all());
+        $data['social_links'] = collect($data['social_links'] ?? [])->filter()->all() ?: null;
+        $employer->update(collect($data)->only(['company_name', 'company_description', 'location', 'website_url', 'social_links'])->all());
         return response()->json(['message' => 'Company profile updated.']);
     }
 
@@ -109,7 +120,7 @@ class EmployerWorkspaceController extends Controller
             'status' => ['nullable', Rule::in(Application::STATUSES)],
         ]);
         $applications = Application::query()->whereHas('job', fn ($query) => $query->where('employer_id', $employer->id))
-            ->with(['job:id,title', 'jobSeeker.user:id,name,email', 'jobSeeker:id,user_id,professional_title,years_experience,skills,languages,cv_path,region_id,township_id', 'jobSeeker.region:id,name', 'jobSeeker.township:id,name'])
+            ->with(['job:id,title', 'jobSeeker.user:id,name,email', 'jobSeeker:id,user_id,professional_title,years_experience,skills,languages,cv_path,region_id,township_id,portfolio_url,social_links', 'jobSeeker.region:id,name', 'jobSeeker.township:id,name'])
             ->when($data['job_id'] ?? null, fn ($query, $id) => $query->where('job_id', $id))
             ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($data['search'] ?? null, function ($query, $search) {
@@ -131,6 +142,8 @@ class EmployerWorkspaceController extends Controller
                     'title' => $application->jobSeeker?->professional_title,
                     'experience' => $application->jobSeeker?->years_experience,
                     'skills' => $application->jobSeeker?->skills ?? [],
+                    'portfolio_url' => $application->jobSeeker?->portfolio_url,
+                    'social_links' => $application->jobSeeker?->social_links ?? [],
                     'location' => collect([$application->jobSeeker?->township?->name, $application->jobSeeker?->region?->name])->filter()->join(', '),
                     'has_cv' => filled($application->jobSeeker?->cv_path) || filled($application->cv_path),
                 ],
@@ -158,7 +171,7 @@ class EmployerWorkspaceController extends Controller
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }
         $jobLimit = (int) $this->entitlements->value($employer, 'max_active_jobs', 1);
-        if ($jobLimit >= 0 && $employer->jobs()->where('status', 'published')->count() >= $jobLimit) {
+        if ($jobLimit >= 0 && Job::published()->where('employer_id', $employer->id)->count() >= $jobLimit) {
             return response()->json([
                 'message' => "Your current plan allows {$jobLimit} active job listing(s). Upgrade your plan or close an active listing to publish another job.",
                 'upgrade_required' => true,
@@ -187,6 +200,15 @@ class EmployerWorkspaceController extends Controller
             'application_deadline' => ['nullable', 'date', 'after:today'],
             'status' => ['sometimes', Rule::in(['published', 'paused', 'closed', 'draft'])],
         ]);
+        $nextStatus = $data['status'] ?? $job->status;
+        $nextExpiry = array_key_exists('application_deadline', $data) ? $data['application_deadline'] : $job->application_deadline;
+        $willBeActive = $nextStatus === 'published' && (! $nextExpiry || ! Carbon::parse($nextExpiry)->isBefore(today()));
+        $isActive = $job->status === 'published' && (! $job->application_deadline || ! $job->application_deadline->isBefore(today()));
+        if ($willBeActive && ! $isActive) {
+            $jobLimit = (int) $this->entitlements->value($employer, 'max_active_jobs', 1);
+            $activeJobs = Job::published()->where('employer_id', $employer->id)->where('id', '!=', $job->id)->count();
+            abort_if($jobLimit >= 0 && $activeJobs >= $jobLimit, 402, "Your plan allows {$jobLimit} active job listing(s). Upgrade your plan or close an active listing to publish this one.");
+        }
         if (isset($data['salary_min'], $data['salary_max']) && $data['salary_min'] > $data['salary_max']) {
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }

@@ -42,6 +42,8 @@ class JobApplicationController extends Controller
                 'company' => [
                     'name' => $job->employer?->company_name,
                     'description' => $job->employer?->company_description,
+                    'website_url' => $job->employer?->website_url,
+                    'social_links' => $job->employer?->social_links ?? [],
                     'location' => collect([$job->employer?->location, $job->employer?->township?->name, $job->employer?->region?->name])->filter()->join(', '),
                     'is_verified' => (bool) $job->employer?->is_verified,
                 ],

@@ -7,10 +7,10 @@ const error = ref('');
 const notice = ref('');
 const profileEditing = ref(false);
 const dashboard = ref({ profile: {}, stats: {}, jobs: [], recent_applicants: [], upcoming_interviews: [] });
-const profileForm = reactive({ name: '', email: '', company_name: '', company_description: '', location: '' });
+const profileForm = reactive({ name: '', email: '', company_name: '', company_description: '', location: '', website_url: '', social_links: { linkedin: '', github: '', facebook: '', instagram: '', x: '' } });
 const jobs = computed(() => dashboard.value.jobs ?? []);
 
-function applyProfile(profile) { Object.assign(profileForm, profile); }
+function applyProfile(profile) { Object.assign(profileForm, profile, { social_links: { linkedin: '', github: '', facebook: '', instagram: '', x: '', ...(profile.social_links ?? {}) } }); }
 function formatDate(value) {
     if (!value) return '—';
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
@@ -37,7 +37,7 @@ async function saveProfile() {
     notice.value = '';
     try {
         await window.axios.patch('/api/employer/profile', profileForm);
-        dashboard.value.profile = { ...profileForm, is_verified: dashboard.value.profile.is_verified };
+        dashboard.value.profile = { ...profileForm, social_links: { ...profileForm.social_links }, is_verified: dashboard.value.profile.is_verified };
         profileEditing.value = false;
         notice.value = 'Company profile saved.';
     } catch (exception) {
@@ -111,9 +111,9 @@ onMounted(loadDashboard);
                         </div>
                         <div v-if="jobs.length" class="divide-y divide-slate-100">
                             <article v-for="job in jobs" :key="job.id" class="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                                <div class="min-w-0 flex-1"><h3 class="truncate font-semibold text-slate-900">{{ job.title }}</h3><p class="mt-1 text-sm text-slate-500">{{ [job.township, job.location].filter(Boolean).join(' · ') }} · {{ job.employment_type?.replaceAll('_', ' ') }}</p><p class="mt-1 text-xs text-slate-500">{{ job.applications_count }} {{ job.applications_count === 1 ? 'application' : 'applications' }} · Posted {{ formatDate(job.posted_at) }}</p></div>
+                                <div class="min-w-0 flex-1"><h3 class="truncate font-semibold text-slate-900">{{ job.title }}</h3><p class="mt-1 text-sm text-slate-500">{{ [job.township, job.location].filter(Boolean).join(' · ') }} · {{ job.employment_type?.replaceAll('_', ' ') }}</p><p class="mt-1 text-xs text-slate-500">{{ job.applications_count }} {{ job.applications_count === 1 ? 'application' : 'applications' }} · Posted {{ formatDate(job.posted_at) }}<span v-if="job.application_deadline"> · Expires {{ formatDate(job.application_deadline) }}</span></p></div>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold capitalize" :class="job.status === 'published' ? 'bg-emerald-50 text-emerald-800' : job.status === 'paused' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'">{{ job.status }}</span>
+                                    <span class="rounded-full px-2.5 py-1 text-xs font-semibold capitalize" :class="job.is_expired ? 'bg-slate-100 text-slate-700' : job.status === 'published' ? 'bg-emerald-50 text-emerald-800' : job.status === 'paused' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'">{{ job.is_expired ? 'Expired' : job.status }}</span>
                                     <a href="/#pipeline" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Applicants</a>
                                     <button type="button" class="rounded-lg px-2 py-2 text-xs font-semibold text-blue-800 hover:bg-blue-50" @click="editJob(job)">Edit</button>
                                     <button v-if="job.status === 'published'" type="button" class="rounded-lg px-2 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-50" @click="updateJob(job, 'paused')">Pause</button>
@@ -134,10 +134,12 @@ onMounted(loadDashboard);
                                 <label class="block text-xs font-semibold text-slate-700">Contact email<input v-model="profileForm.email" required type="email" maxlength="255" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"></label>
                                 <label class="block text-xs font-semibold text-slate-700">Company name<input v-model="profileForm.company_name" required maxlength="255" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"></label>
                                 <label class="block text-xs font-semibold text-slate-700">Company location<input v-model="profileForm.location" maxlength="255" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"></label>
+                                <label class="block text-xs font-semibold text-slate-700">Company website<input v-model="profileForm.website_url" type="url" maxlength="2048" placeholder="https://example.com" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"></label>
                                 <label class="block text-xs font-semibold text-slate-700">Company description<textarea v-model="profileForm.company_description" rows="3" maxlength="5000" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label>
+                                <fieldset class="space-y-3 border-t border-slate-100 pt-3"><legend class="text-xs font-semibold text-slate-700">Social profiles <span class="font-normal text-slate-500">(optional)</span></legend><label v-for="platform in ['linkedin', 'github', 'facebook', 'instagram', 'x']" :key="platform" class="block text-xs font-medium capitalize text-slate-600">{{ platform === 'x' ? 'X' : platform }}<input v-model="profileForm.social_links[platform]" type="url" maxlength="2048" :placeholder="'https://' + (platform === 'x' ? 'x.com' : platform + '.com') + '/your-company'" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"></label></fieldset>
                                 <button :disabled="saving" class="w-full rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{{ saving ? 'Saving…' : 'Save profile' }}</button>
                             </form>
-                            <dl v-else class="space-y-4 p-5 text-sm"><div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Account contact</dt><dd class="mt-1 font-medium text-slate-900">{{ dashboard.profile.name || '—' }}</dd><dd class="text-slate-600">{{ dashboard.profile.email || '—' }}</dd></div><div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Company</dt><dd class="mt-1 font-medium text-slate-900">{{ dashboard.profile.company_name || '—' }}</dd><dd class="text-slate-600">{{ [dashboard.profile.location, dashboard.profile.township, dashboard.profile.region].filter(Boolean).join(' · ') || 'Location not provided' }}</dd><dd class="mt-2 whitespace-pre-line leading-5 text-slate-600">{{ dashboard.profile.company_description || 'Add a company description to help candidates understand your organization.' }}</dd></div></dl>
+                            <dl v-else class="space-y-4 p-5 text-sm"><div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Account contact</dt><dd class="mt-1 font-medium text-slate-900">{{ dashboard.profile.name || '—' }}</dd><dd class="text-slate-600">{{ dashboard.profile.email || '—' }}</dd></div><div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Company</dt><dd class="mt-1 font-medium text-slate-900">{{ dashboard.profile.company_name || '—' }}</dd><dd class="text-slate-600">{{ [dashboard.profile.location, dashboard.profile.township, dashboard.profile.region].filter(Boolean).join(' · ') || 'Location not provided' }}</dd><dd class="mt-2 whitespace-pre-line leading-5 text-slate-600">{{ dashboard.profile.company_description || 'Add a company description to help candidates understand your organization.' }}</dd><a v-if="dashboard.profile.website_url" :href="dashboard.profile.website_url" target="_blank" rel="noopener noreferrer" class="mt-3 inline-block font-semibold text-blue-800 hover:underline">Company website</a><div v-if="Object.values(dashboard.profile.social_links ?? {}).some(Boolean)" class="mt-3 flex flex-wrap gap-3"><template v-for="(url, platform) in dashboard.profile.social_links" :key="platform"><a v-if="url" :href="url" target="_blank" rel="noopener noreferrer" class="font-medium capitalize text-blue-800 hover:underline">{{ platform === 'x' ? 'X' : platform }}</a></template></div></div></dl>
                         </section>
 
                         <section class="rounded-xl border border-slate-200 bg-white shadow-sm">

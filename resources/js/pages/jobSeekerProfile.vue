@@ -5,8 +5,17 @@ const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const source = bootstrap.profile ?? {};
 const old = bootstrap.old ?? {};
 const hasErrors = Object.keys(bootstrap.errors ?? {}).length > 0;
+const socialPlatforms = [
+    { key: 'linkedin', label: 'LinkedIn' },
+    { key: 'github', label: 'GitHub' },
+    { key: 'facebook', label: 'Facebook' },
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'x', label: 'X' },
+];
 const profile = reactive({
     ...source,
+    portfolio_url: source.portfolio_url ?? '',
+    social_links: { linkedin: '', github: '', facebook: '', instagram: '', x: '', ...(source.social_links ?? {}) },
     user: { name: '', email: '', ...(source.user ?? {}) },
     region: source.region ?? null,
     township: source.township ?? null,
@@ -16,6 +25,8 @@ const profile = reactive({
 const draft = reactive({
     ...source,
     ...old,
+    portfolio_url: old.portfolio_url ?? profile.portfolio_url,
+    social_links: { linkedin: '', github: '', facebook: '', instagram: '', x: '', ...(profile.social_links ?? {}), ...(old.social_links ?? {}) },
     user: { name: old.name ?? profile.user.name, email: old.email ?? profile.user.email },
     experiences: (old.experiences ?? profile.experiences).map((item) => ({ ...item })),
     educations: (old.educations ?? profile.educations).map((item) => ({ ...item })),
@@ -114,6 +125,7 @@ const availabilityOptions = [
                                 <span v-if="profile.phone"><i class="ti ti-phone mr-1" aria-hidden="true" />{{ profile.phone }}</span>
                                 <span v-if="profile.region"><i class="ti ti-map-pin mr-1" aria-hidden="true" />{{ profile.township ? `${profile.township.name}, ` : '' }}{{ profile.region.name }}</span>
                             </p>
+                            <div v-if="profile.portfolio_url || Object.values(profile.social_links ?? {}).some(Boolean)" class="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm"><a v-if="profile.portfolio_url" :href="profile.portfolio_url" target="_blank" rel="noopener noreferrer" class="font-semibold text-blue-800 hover:underline">Portfolio</a><template v-for="platform in socialPlatforms" :key="platform.key"><a v-if="profile.social_links?.[platform.key]" :href="profile.social_links[platform.key]" target="_blank" rel="noopener noreferrer" class="font-medium text-blue-800 hover:underline">{{ platform.label }}</a></template></div>
                         </div>
                     </div>
                     <button type="button" class="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] sm:self-center" @click="openEditor">
@@ -246,6 +258,9 @@ const availabilityOptions = [
                     <div><label for="edit-headline" class="form-label">Professional headline</label><input id="edit-headline" name="professional_title" v-model="draft.professional_title" maxlength="160" class="form-field"><p v-if="fieldError('professional_title')" class="field-error">{{ fieldError('professional_title') }}</p></div>
                     <div><label for="edit-years" class="form-label">Years of experience</label><input id="edit-years" name="years_experience" v-model="draft.years_experience" type="number" min="0" max="60" class="form-field"><p v-if="fieldError('years_experience')" class="field-error">{{ fieldError('years_experience') }}</p></div>
                     <div class="sm:col-span-2"><label for="edit-bio" class="form-label">Professional summary</label><textarea id="edit-bio" name="bio" v-model="draft.bio" rows="4" maxlength="5000" class="form-field"></textarea><p v-if="fieldError('bio')" class="field-error">{{ fieldError('bio') }}</p></div>
+                    <div id="edit-online-presence" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Portfolio and social profiles <span class="font-normal text-slate-500">(optional)</span></h3><p class="mt-1 text-xs text-slate-500">Share professional work and profiles you want employers to see.</p></div>
+                    <div class="sm:col-span-2"><label for="edit-portfolio" class="form-label">Portfolio or personal website</label><input id="edit-portfolio" name="portfolio_url" v-model="draft.portfolio_url" type="url" maxlength="2048" placeholder="https://yourportfolio.com" class="form-field"><p v-if="fieldError('portfolio_url')" class="field-error">{{ fieldError('portfolio_url') }}</p></div>
+                    <div v-for="platform in socialPlatforms" :key="platform.key"><label :for="`edit-social-${platform.key}`" class="form-label">{{ platform.label }} profile</label><input :id="`edit-social-${platform.key}`" v-model="draft.social_links[platform.key]" :name="`social_links[${platform.key}]`" type="url" maxlength="2048" :placeholder="'https://' + (platform.key === 'x' ? 'x.com' : platform.key + '.com') + '/your-profile'" class="form-field"><p v-if="fieldError(`social_links.${platform.key}`)" class="field-error">{{ fieldError(`social_links.${platform.key}`) }}</p></div>
                     <div id="edit-skills-section" class="sm:col-span-2 scroll-mt-24 border-t border-slate-100 pt-5"><h3 class="font-semibold text-slate-900">Skills and languages</h3></div>
                     <div><label for="edit-skills" class="form-label">Skills, separated by commas</label><textarea id="edit-skills" name="skills_text" v-model="skillsText" rows="3" maxlength="2000" class="form-field"></textarea><p v-if="fieldError('skills_text')" class="field-error">{{ fieldError('skills_text') }}</p></div>
                     <div><label for="edit-languages" class="form-label">Languages, separated by commas</label><textarea id="edit-languages" name="languages_text" v-model="languagesText" rows="3" maxlength="1000" class="form-field"></textarea><p v-if="fieldError('languages_text')" class="field-error">{{ fieldError('languages_text') }}</p></div>
