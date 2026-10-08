@@ -36,6 +36,7 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
     Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('/employer/billing', [BillingController::class, 'overview'])->name('employer.billing');
     Route::post('/employer/billing/orders', [BillingController::class, 'createOrder'])->middleware('throttle:10,1')->name('employer.billing.orders.store');
+    Route::patch('/employer/billing/orders/{order}/cancel', [BillingController::class, 'cancelOrder'])->name('employer.billing.orders.cancel');
     Route::post('/employer/billing/orders/{order}/payments', [BillingController::class, 'submitPayment'])->middleware('throttle:5,1')->name('employer.billing.payments.store');
     Route::get('/billing/invoices/{invoice}', [BillingController::class, 'invoice'])->name('billing.invoices.show');
     Route::get('/admin/billing/payments', [BillingController::class, 'adminPayments'])->name('admin.billing.payments');

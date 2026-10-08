@@ -85,13 +85,21 @@ class BillingController extends Controller
                     'currency' => $product->currency, 'duration_days' => $product->duration_days,
                 ]),
             'jobs' => $employer->jobs()->where('status', 'published')->orderBy('title')->get(['id', 'title']),
-            'orders' => $employer->orders()->with(['items', 'payments', 'invoice'])->latest()->limit(20)->get()
+            'orders' => $employer->orders()->with(['items', 'payments.refunds', 'invoice'])->latest()->limit(20)->get()
                 ->map(fn (Order $order) => [
                     'id' => $order->id, 'order_number' => $order->order_number, 'status' => $order->status,
                     'currency' => $order->currency, 'total_amount' => $order->total_amount,
                     'created_at' => $order->created_at?->toIso8601String(),
                     'items' => $order->items->map(fn (OrderItem $item) => ['name' => $item->item_name, 'quantity' => $item->quantity]),
                     'latest_payment_status' => $order->payments->sortByDesc('id')->first()?->status,
+                    'cancelled_at' => $order->cancelled_at?->toIso8601String(),
+                    'payments' => $order->payments->sortByDesc('id')->map(fn (Payment $payment) => [
+                        'id' => $payment->id, 'status' => $payment->status, 'method' => $payment->payment_method,
+                        'reference' => $payment->reference_number, 'submitted_at' => $payment->submitted_at?->toIso8601String(),
+                        'paid_at' => $payment->paid_at?->toIso8601String(), 'failed_at' => $payment->failed_at?->toIso8601String(),
+                        'failure_reason' => $payment->failure_reason,
+                        'refunds' => $payment->refunds->map(fn (Refund $refund) => ['amount' => $refund->amount, 'currency' => $refund->currency, 'reason' => $refund->reason, 'reference_number' => $refund->reference_number, 'processed_at' => $refund->processed_at?->toIso8601String()]),
+                    ])->values(),
                     'invoice_id' => $order->invoice?->id,
                 ]),
             'transfer_instructions' => [
@@ -132,6 +140,7 @@ class BillingController extends Controller
         }
 
         $order = DB::transaction(function () use ($request, $employer, $data, $item, $plan, $product, $job) {
+            Employer::query()->lockForUpdate()->findOrFail($employer->id);
             $pending = $employer->orders()->whereIn('status', ['pending_payment', 'awaiting_review'])->exists();
             abort_if($pending, 422, 'Complete or cancel your pending order before creating another.');
 
@@ -189,9 +198,6 @@ class BillingController extends Controller
     {
         $employer = $this->employer($request);
         abort_unless($order->employer_id === $employer->id, 404);
-        abort_unless(in_array($order->status, ['pending_payment', 'payment_failed'], true), 422, 'This order is not accepting a payment submission.');
-        abort_if($order->total_amount <= 0, 422, 'A zero-value order does not require payment.');
-        abort_if($order->payments()->whereIn('status', ['pending', 'processing'])->exists(), 422, 'A payment is already awaiting review.');
         $data = $request->validate([
             'payment_method' => ['required', Rule::in(['bank_transfer'])],
             'reference_number' => ['nullable', 'string', 'max:120'],
@@ -199,19 +205,23 @@ class BillingController extends Controller
         ]);
         $path = $request->file('proof')->store('billing/payment-proofs', 'local');
         try {
-            $payment = DB::transaction(function () use ($request, $order, $data, $path) {
-                $payment = $order->payments()->create([
+            $payment = DB::transaction(function () use ($request, $order, $employer, $data, $path) {
+                $lockedOrder = Order::query()->where('employer_id', $employer->id)->lockForUpdate()->findOrFail($order->id);
+                abort_unless(in_array($lockedOrder->status, ['pending_payment', 'payment_failed'], true), 422, 'This order is not accepting a payment submission.');
+                abort_if($lockedOrder->total_amount <= 0, 422, 'A zero-value order does not require payment.');
+                abort_if($lockedOrder->payments()->whereIn('status', ['pending', 'processing'])->exists(), 422, 'A payment is already awaiting review.');
+                $payment = $lockedOrder->payments()->create([
                     'user_id' => $request->user()->id,
                     'payment_method' => $data['payment_method'],
                     'payment_provider' => 'manual_bank_transfer',
                     'status' => 'pending',
-                    'amount' => $order->total_amount,
-                    'currency' => $order->currency,
+                    'amount' => $lockedOrder->total_amount,
+                    'currency' => $lockedOrder->currency,
                     'reference_number' => $data['reference_number'] ?? null,
                     'proof_path' => $path,
                     'submitted_at' => now(),
                 ]);
-                $order->update(['status' => 'awaiting_review']);
+                $lockedOrder->update(['status' => 'awaiting_review']);
                 return $payment;
             });
         } catch (\Throwable $exception) {
@@ -219,6 +229,21 @@ class BillingController extends Controller
             throw $exception;
         }
         return response()->json(['message' => 'Payment receipt submitted. The platform team will review it.', 'payment_status' => $payment->status], 201);
+    }
+
+    public function cancelOrder(Request $request, Order $order): JsonResponse
+    {
+        $employer = $this->employer($request);
+        abort_unless($order->employer_id === $employer->id, 404);
+
+        DB::transaction(function () use ($order, $employer) {
+            $lockedOrder = Order::query()->where('employer_id', $employer->id)->lockForUpdate()->findOrFail($order->id);
+            abort_unless(in_array($lockedOrder->status, ['pending_payment', 'payment_failed'], true), 422, 'Only unpaid orders without a receipt awaiting review can be cancelled.');
+            abort_if($lockedOrder->payments()->whereIn('status', ['pending', 'processing'])->exists(), 422, 'A submitted receipt must be reviewed before this order can be cancelled.');
+            $lockedOrder->update(['status' => 'cancelled', 'cancelled_at' => now()]);
+        });
+
+        return response()->json(['message' => 'Unpaid order cancelled.']);
     }
 
     public function invoice(Request $request, Invoice $invoice)
@@ -231,8 +256,21 @@ class BillingController extends Controller
     public function adminPayments(Request $request): JsonResponse
     {
         $this->admin($request);
-        $payments = Payment::query()->with(['user:id,name,email', 'order.employer:id,company_name', 'order.items', 'reviewer:id,name'])
-            ->latest()->paginate(40);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['pending', 'processing', 'paid', 'failed', 'partially_refunded', 'refunded'])],
+        ]);
+        $payments = Payment::query()->with(['user:id,name,email', 'order.employer:id,company_name', 'order.items', 'reviewer:id,name', 'refunds'])
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['q'] ?? null, function ($query, $term) {
+                $query->where(function ($match) use ($term) {
+                    $match->where('reference_number', 'like', "%{$term}%")
+                        ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$term}%")->orWhere('email', 'like', "%{$term}%"))
+                        ->orWhereHas('order', fn ($order) => $order->where('order_number', 'like', "%{$term}%")
+                            ->orWhereHas('employer', fn ($employer) => $employer->where('company_name', 'like', "%{$term}%")));
+                });
+            })
+            ->latest()->paginate(40)->withQueryString();
         return response()->json([
             'payments' => $payments->through(fn (Payment $payment) => [
                 'id' => $payment->id, 'status' => $payment->status, 'method' => $payment->payment_method,
@@ -243,6 +281,10 @@ class BillingController extends Controller
                 'company' => $payment->order?->employer?->company_name,
                 'order' => ['id' => $payment->order?->id, 'number' => $payment->order?->order_number, 'status' => $payment->order?->status, 'items' => $payment->order?->items->pluck('item_name') ?? []],
                 'reviewer' => $payment->reviewer?->name,
+                'reviewed_at' => $payment->paid_at?->toIso8601String() ?? $payment->failed_at?->toIso8601String(),
+                'refund_total' => (int) $payment->refunds->where('status', 'processed')->sum('amount'),
+                'refund_remaining' => max(0, (int) $payment->amount - (int) $payment->refunds->where('status', 'processed')->sum('amount')),
+                'refunds' => $payment->refunds->map(fn (Refund $refund) => ['amount' => $refund->amount, 'reason' => $refund->reason, 'reference_number' => $refund->reference_number, 'processed_at' => $refund->processed_at?->toIso8601String()]),
             ]),
         ]);
     }
@@ -262,7 +304,7 @@ class BillingController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
         $before = ['payment_status' => $payment->status, 'order_status' => $payment->order?->status];
-        DB::transaction(function () use ($payment, $admin, $data) {
+        DB::transaction(function () use ($request, $payment, $admin, $data, $before) {
             $payment = Payment::query()->lockForUpdate()->with(['order.items.plan', 'order.items.product', 'order.employer'])->findOrFail($payment->id);
             abort_unless($payment->status === 'pending' && $payment->order?->status === 'awaiting_review', 422, 'This payment has already been reviewed.');
             if ($data['decision'] === 'reject') {
@@ -271,6 +313,7 @@ class BillingController extends Controller
                 if ($payment->order->employer?->user) {
                     Notification::sendNotification($payment->order->employer->user, 'Payment receipt needs attention', $data['notes'] ?: 'Your transfer receipt could not be verified. Submit a new receipt from billing.', null, 'billing', '/#billing');
                 }
+                $this->audit->record($request, $admin, 'payment.reviewed.reject', $payment, $before, ['payment_status' => $payment->status, 'order_status' => $payment->order->status, 'notes' => $payment->failure_reason]);
                 return;
             }
 
@@ -328,9 +371,8 @@ class BillingController extends Controller
             if ($order->employer?->user) {
                 Notification::sendNotification($order->employer->user, 'Payment approved', "Order {$order->order_number} has been paid and its items are active.", null, 'billing', '/#billing');
             }
+            $this->audit->record($request, $admin, 'payment.reviewed.approve', $payment, $before, ['payment_status' => $payment->status, 'order_status' => $order->status, 'invoice_id' => $invoice->id]);
         });
-        $payment->refresh()->load('order');
-        $this->audit->record($request, $admin, 'payment.reviewed.'.$data['decision'], $payment, $before, ['payment_status' => $payment->status, 'order_status' => $payment->order?->status, 'notes' => $data['notes'] ?? null]);
         return response()->json(['message' => $data['decision'] === 'approve' ? 'Payment approved and order fulfilled.' : 'Payment rejected; the employer can submit a new receipt.']);
     }
 
@@ -366,7 +408,7 @@ class BillingController extends Controller
         abort_unless(in_array($payment->status, ['paid', 'partially_refunded'], true), 422, 'Only captured payments can be refunded.');
         $data = $request->validate(['amount' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'max:2000'], 'reference_number' => ['nullable', 'string', 'max:120']]);
         $before = ['status' => $payment->status, 'amount' => $payment->amount];
-        $refund = DB::transaction(function () use ($payment, $admin, $data) {
+        $refund = DB::transaction(function () use ($request, $payment, $admin, $data, $before) {
             $payment = Payment::query()->lockForUpdate()->with('order.items')->findOrFail($payment->id);
             abort_unless(in_array($payment->status, ['paid', 'partially_refunded'], true), 422, 'Only captured payments can be refunded.');
             $refunded = (int) $payment->refunds()->where('status', 'processed')->sum('amount');
@@ -386,10 +428,10 @@ class BillingController extends Controller
                     JobPromotion::query()->whereIn('order_item_id', $itemIds)->whereIn('status', ['active', 'scheduled'])->update(['status' => 'cancelled']);
                 }
             }
+            $this->audit->record($request, $admin, 'payment.refund_recorded', $payment, $before, ['status' => $payment->status, 'refund_id' => $refund->id, 'refund_amount' => $refund->amount, 'reason' => $refund->reason]);
             return $refund;
         });
         $payment->refresh();
-        $this->audit->record($request, $admin, 'payment.refund_recorded', $payment, $before, ['status' => $payment->status, 'refund_id' => $refund->id, 'refund_amount' => $refund->amount, 'reason' => $refund->reason]);
         return response()->json(['message' => 'Manual refund recorded. Ensure the funds were returned outside the platform before recording it.', 'refund_id' => $refund->id]);
     }
 
