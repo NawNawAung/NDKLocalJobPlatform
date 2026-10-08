@@ -21,6 +21,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionItem;
 use App\Models\User;
 use App\Services\EmployerEntitlementService;
+use App\Services\AdminAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,7 +33,7 @@ use Illuminate\Validation\Rules\File;
 
 class BillingController extends Controller
 {
-    public function __construct(private readonly EmployerEntitlementService $entitlements) {}
+    public function __construct(private readonly EmployerEntitlementService $entitlements, private readonly AdminAuditLogger $audit) {}
 
     private function employer(Request $request): Employer
     {
@@ -260,6 +261,7 @@ class BillingController extends Controller
             'decision' => ['required', Rule::in(['approve', 'reject'])],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+        $before = ['payment_status' => $payment->status, 'order_status' => $payment->order?->status];
         DB::transaction(function () use ($payment, $admin, $data) {
             $payment = Payment::query()->lockForUpdate()->with(['order.items.plan', 'order.items.product', 'order.employer'])->findOrFail($payment->id);
             abort_unless($payment->status === 'pending' && $payment->order?->status === 'awaiting_review', 422, 'This payment has already been reviewed.');
@@ -327,6 +329,8 @@ class BillingController extends Controller
                 Notification::sendNotification($order->employer->user, 'Payment approved', "Order {$order->order_number} has been paid and its items are active.", null, 'billing', '/#billing');
             }
         });
+        $payment->refresh()->load('order');
+        $this->audit->record($request, $admin, 'payment.reviewed.'.$data['decision'], $payment, $before, ['payment_status' => $payment->status, 'order_status' => $payment->order?->status, 'notes' => $data['notes'] ?? null]);
         return response()->json(['message' => $data['decision'] === 'approve' ? 'Payment approved and order fulfilled.' : 'Payment rejected; the employer can submit a new receipt.']);
     }
 
@@ -361,6 +365,7 @@ class BillingController extends Controller
         $admin = $this->admin($request);
         abort_unless(in_array($payment->status, ['paid', 'partially_refunded'], true), 422, 'Only captured payments can be refunded.');
         $data = $request->validate(['amount' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'max:2000'], 'reference_number' => ['nullable', 'string', 'max:120']]);
+        $before = ['status' => $payment->status, 'amount' => $payment->amount];
         $refund = DB::transaction(function () use ($payment, $admin, $data) {
             $payment = Payment::query()->lockForUpdate()->with('order.items')->findOrFail($payment->id);
             abort_unless(in_array($payment->status, ['paid', 'partially_refunded'], true), 422, 'Only captured payments can be refunded.');
@@ -383,6 +388,8 @@ class BillingController extends Controller
             }
             return $refund;
         });
+        $payment->refresh();
+        $this->audit->record($request, $admin, 'payment.refund_recorded', $payment, $before, ['status' => $payment->status, 'refund_id' => $refund->id, 'refund_amount' => $refund->amount, 'reason' => $refund->reason]);
         return response()->json(['message' => 'Manual refund recorded. Ensure the funds were returned outside the platform before recording it.', 'refund_id' => $refund->id]);
     }
 

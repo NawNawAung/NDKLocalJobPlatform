@@ -15,6 +15,7 @@ class Employer extends Model
     public function region(): BelongsTo { return $this->belongsTo(Region::class); }
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function jobs(): HasMany { return $this->hasMany(Job::class); }
+    public function reviews(): HasMany { return $this->hasMany(EmployerReview::class); }
     public function interviews(): HasMany { return $this->hasMany(Interview::class); }
     public function subscriptions(): HasMany { return $this->hasMany(Subscription::class); }
     public function orders(): HasMany { return $this->hasMany(Order::class); }

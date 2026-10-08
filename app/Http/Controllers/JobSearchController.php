@@ -19,6 +19,7 @@ class JobSearchController extends Controller
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'township_id' => ['nullable', 'integer', Rule::exists('townships', 'id')->where(fn ($query) => $query->where('region_id', $request->input('region_id')))],
             'category' => ['nullable', 'string', 'max:100'],
+            'category_id' => ['nullable', 'integer', Rule::exists('job_categories', 'id')->where('is_active', true)],
             'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'internship', 'temporary'])],
             'experience_level' => ['nullable', Rule::in(['entry', 'junior', 'mid', 'senior', 'lead'])],
             'work_mode' => ['nullable', Rule::in(['on_site', 'hybrid', 'remote'])],
@@ -30,7 +31,10 @@ class JobSearchController extends Controller
         ]);
 
         $employer = $request->user()?->role === 'employer' ? $request->user()->employer : null;
-        $jobs = Job::published()
+        $jobs = Job::published()->with([
+            'jobCategory:id,name,slug',
+            'employer' => fn ($query) => $query->with('user:id,name')->withCount(['reviews as approved_reviews_count' => fn ($reviews) => $reviews->where('status', 'approved')])->withAvg(['reviews as approved_reviews_avg_rating' => fn ($reviews) => $reviews->where('status', 'approved')], 'rating'),
+        ])
             ->when($employer, fn (Builder $query) => $query->where('employer_id', '!=', $employer->id))
             ->with(['employer.user', 'township.region', 'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())])
             ->withCount(['promotions as active_featured_promotions_count' => fn ($query) => $query->where('promotion_type', 'featured')->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now())])
@@ -60,7 +64,8 @@ class JobSearchController extends Controller
                     if ($township) $location->orWhere('location', 'like', "%{$township->name}%");
                 });
             })
-            ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where('category', 'like', "%{$category}%"))
+            ->when($filters['category_id'] ?? null, fn (Builder $query, int $categoryId) => $query->where('category_id', $categoryId))
+            ->when(! isset($filters['category_id']) && ($filters['category'] ?? null), fn (Builder $query, string $category) => $query->where('category', 'like', "%{$category}%"))
             ->when($filters['employment_type'] ?? null, fn (Builder $query, string $type) => $query->where('employment_type', $type))
             ->when($filters['experience_level'] ?? null, fn (Builder $query, string $level) => $query->where('experience_level', $level))
             ->when($filters['work_mode'] ?? null, fn (Builder $query, string $mode) => $query->where('work_mode', $mode))
@@ -95,8 +100,11 @@ class JobSearchController extends Controller
             'data' => $results->getCollection()->map(fn (Job $job) => [
                 'id' => $job->id,
                 'title' => $job->title,
-                'category' => $job->category,
+                'category' => $job->jobCategory?->name ?? $job->category,
+                'category_id' => $job->category_id,
                 'company' => $job->employer?->company_name ?? $job->employer?->user?->name ?? 'Employer',
+                'company_rating' => $job->employer?->approved_reviews_avg_rating !== null ? round((float) $job->employer->approved_reviews_avg_rating, 1) : null,
+                'company_review_count' => $job->employer?->approved_reviews_count ?? 0,
                 'location' => $job->township
                     ? $job->township->name.', '.$job->township->region->name
                     : ($job->location ?: 'Location not specified'),

@@ -304,10 +304,11 @@ class AuthController extends Controller
                 'region:id,name,type', 'township:id,name', 'experiences', 'educations',
                 'applications:id,job_id,job_seeker_id,status,submitted_at,created_at',
                 'applications.job:id,employer_id,title,location',
-                'applications.job.employer:id,company_name',
+                'applications.job.employer:id,user_id,company_name',
             ])->withCount(['applications', 'savedJobs'])->first();
             if ($seeker) {
                 $seekerProfile = [...$seeker->toArray(), 'user' => $user->only(['name', 'email'])];
+                $seekerProfile['employer_reviews_by_id'] = $seeker->employerReviews()->get(['employer_id', 'status', 'rating'])->keyBy('employer_id')->map(fn ($review) => ['status' => $review->status, 'rating' => $review->rating]);
                 $seekerProfile['profile_photo_url'] = $seeker->profile_photo_path
                     ? Storage::disk('public')->url($seeker->profile_photo_path)
                     : null;

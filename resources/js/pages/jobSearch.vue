@@ -9,7 +9,7 @@ const filters = reactive({
     keyword: params.get('keyword') ?? '',
     region_id: params.get('region_id') ?? '',
     township_id: params.get('township_id') ?? '',
-    category: params.get('category') ?? '',
+    category_id: params.get('category_id') ?? '',
     experience_level: params.get('experience_level') ?? '',
     employment_type: params.get('employment_type') ?? '',
     work_mode: params.get('work_mode') ?? '',
@@ -25,6 +25,7 @@ const page = ref(Number(params.get('page') ?? 1));
 const lastPage = ref(1);
 const loading = ref(false);
 const errorMessage = ref('');
+const categories = ref([]);
 
 function queryString(pageNumber = 1) {
     const query = new URLSearchParams();
@@ -64,7 +65,7 @@ async function loadJobs(pageNumber = 1) {
 
 function resetFilters() {
     Object.assign(filters, {
-        keyword: '', region_id: '', township_id: '', category: '', experience_level: '',
+        keyword: '', region_id: '', township_id: '', category_id: '', experience_level: '',
         employment_type: '', work_mode: '', salary_min: '', salary_max: '', date_posted: '', sort: 'latest',
     });
     loadJobs();
@@ -109,7 +110,23 @@ function openJob(job) {
     window.location.hash = `details?job=${job.id}`;
 }
 
-onMounted(() => loadJobs(page.value));
+onMounted(async () => {
+    try {
+        const response = await fetch('/api/job-categories', { headers: { Accept: 'application/json' } });
+        if (response.ok) categories.value = (await response.json()).categories ?? [];
+        const legacyCategory = params.get('category');
+        if (legacyCategory && !filters.category_id) {
+            const match = categories.value.find((category) => category.name.toLowerCase() === legacyCategory.toLowerCase());
+            if (match) filters.category_id = String(match.id);
+        }
+        if (legacyCategory && filters.category_id) {
+            params.delete('category');
+            params.set('category_id', filters.category_id);
+            window.history.replaceState({}, '', `/jobs?${params.toString()}`);
+        }
+    } catch { /* The search endpoint still supports saved category filters when categories are unavailable. */ }
+    finally { loadJobs(page.value); }
+});
 </script>
 
 <template>
@@ -148,8 +165,8 @@ onMounted(() => loadJobs(page.value));
                             </select>
                         </label>
                         <label class="block">
-                            <span class="mb-1.5 block text-sm font-medium text-slate-700">Role or category</span>
-                            <input v-model="filters.category" type="search" placeholder="e.g. Technology, Finance" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
+                            <span class="mb-1.5 block text-sm font-medium text-slate-700">Job category</span>
+                            <select v-model="filters.category_id" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100"><option value="">All categories</option><option v-for="category in categories" :key="category.id" :value="String(category.id)">{{ category.name }}</option></select>
                         </label>
                         <label class="block">
                             <span class="mb-1.5 block text-sm font-medium text-slate-700">Experience</span>
@@ -204,6 +221,7 @@ onMounted(() => loadJobs(page.value));
                             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                                 <div class="min-w-0">
                                     <p class="text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)]">{{ job.company }}</p>
+                                    <p v-if="job.company_rating" class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><i class="ti ti-star-filled" aria-hidden="true"/>{{ Number(job.company_rating).toFixed(1) }} <span class="font-normal text-slate-500">({{ job.company_review_count }} reviews)</span></p>
                                     <h2 class="mt-1 text-lg font-bold text-[var(--brand-ink)]">{{ job.title }}</h2>
                                     <span v-if="job.is_featured" class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900"><i class="ti ti-star-filled" aria-hidden="true"/>Featured</span>
                                     <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">

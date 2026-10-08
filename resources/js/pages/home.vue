@@ -4,7 +4,8 @@ import { computed, onMounted, ref } from 'vue';
 const keyword = ref('');
 const regionId = ref('');
 const townshipId = ref('');
-const category = ref('');
+const categoryId = ref('');
+const categories = ref([]);
 const experienceLevel = ref('');
 const employmentType = ref('');
 const workMode = ref('');
@@ -26,7 +27,7 @@ function submitSearch() {
         keyword: keyword.value.trim(),
         region_id: regionId.value,
         township_id: townshipId.value,
-        category: category.value.trim(),
+        category_id: categoryId.value,
         experience_level: experienceLevel.value,
         employment_type: employmentType.value,
         work_mode: workMode.value,
@@ -52,7 +53,9 @@ function usePopularSearch(term) {
 }
 
 function searchByCategory(value) {
-    category.value = value;
+    const match = categories.value.find((item) => item.name.toLowerCase().includes(value.toLowerCase()));
+    if (match) categoryId.value = String(match.id);
+    else keyword.value = value;
     submitSearch();
 }
 function formatLabel(value) {
@@ -86,8 +89,12 @@ function applicationStatusClass(status) {
 
 onMounted(async () => {
     try {
-        const { data } = await window.axios.get('/api/jobs/search');
+        const [{ data }, categoryResponse] = await Promise.all([
+            window.axios.get('/api/jobs/search'),
+            window.axios.get('/api/job-categories'),
+        ]);
         featuredJobs.value = (data.data ?? []).slice(0, 3);
+        categories.value = categoryResponse.data.categories ?? [];
     } catch {
         featuredError.value = 'Featured jobs are unavailable right now.';
     } finally { featuredLoading.value = false; }
@@ -134,8 +141,8 @@ onMounted(async () => {
                 </button>
                 <div v-if="advancedFiltersOpen" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Role or category</span>
-                    <input v-model="category" type="search" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" placeholder="e.g. Technology, Finance">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Job category</span>
+                    <select v-model="categoryId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100"><option value="">All categories</option><option v-for="item in categories" :key="item.id" :value="String(item.id)">{{ item.name }}</option></select>
                   </label>
                   <label class="block">
                     <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Experience</span>

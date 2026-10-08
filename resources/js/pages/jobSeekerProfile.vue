@@ -40,6 +40,11 @@ const regions = computed(() => bootstrap.regions ?? []);
 const townships = computed(() => regions.value.find((item) => String(item.id) === regionId.value)?.townships ?? []);
 const errors = bootstrap.errors ?? {};
 const notice = bootstrap.status ?? '';
+const employerReviewStatuses = ['shortlisted', 'interview', 'offered', 'hired', 'rejected'];
+const reviewDrafts = reactive({});
+const reviewOpenId = ref(null);
+const reviewSavingId = ref(null);
+const reviewError = ref('');
 
 watch(regionId, () => { townshipId.value = ''; });
 
@@ -90,6 +95,32 @@ function openEditor() {
     languagesText.value = (profile.languages ?? []).join(', ');
     editing.value = true;
     nextTick(() => document.getElementById('profile-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+function canReviewEmployer(application) {
+    const employerId = application.job?.employer?.id;
+    return employerId && employerReviewStatuses.includes(application.status) && !profile.employer_reviews_by_id?.[employerId];
+}
+function toggleEmployerReview(application) {
+    const employerId = application.job.employer.id;
+    reviewOpenId.value = reviewOpenId.value === employerId ? null : employerId;
+    reviewDrafts[employerId] ??= { rating: 5, title: '', review: '' };
+    reviewError.value = '';
+}
+async function submitEmployerReview(application) {
+    const employerId = application.job?.employer?.id;
+    if (!employerId || reviewSavingId.value) return;
+    reviewSavingId.value = employerId;
+    reviewError.value = '';
+    try {
+        const { data } = await window.axios.post(`/api/applications/${application.id}/employer-review`, reviewDrafts[employerId]);
+        profile.employer_reviews_by_id ??= {};
+        profile.employer_reviews_by_id[employerId] = { status: data.status, rating: reviewDrafts[employerId].rating };
+        reviewOpenId.value = null;
+        notice.value = data.message;
+    } catch (exception) {
+        reviewError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not submit the employer review.';
+    } finally { reviewSavingId.value = null; }
 }
 
 const employmentOptions = [
@@ -226,6 +257,20 @@ const availabilityOptions = [
                     <article v-for="application in profile.applications" :key="application.id" class="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0">
                         <div class="min-w-0"><h3 class="truncate font-semibold text-slate-900">{{ application.job?.title || 'Job listing unavailable' }}</h3><p class="mt-1 text-sm text-slate-600">{{ application.job?.employer?.company_name || 'Employer' }}<span v-if="application.job?.location"> · {{ application.job.location }}</span></p><p class="mt-1 text-xs text-slate-500">Applied {{ application.submitted_at ? new Date(application.submitted_at).toLocaleDateString() : '—' }}</p></div>
                         <span class="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold capitalize" :class="application.status === 'rejected' ? 'bg-red-50 text-red-800' : application.status === 'hired' || application.status === 'offered' ? 'bg-emerald-50 text-emerald-800' : 'bg-blue-50 text-blue-900'">{{ application.status?.replaceAll('_', ' ') }}</span>
+                        <span v-if="profile.employer_reviews_by_id?.[application.job?.employer?.id]?.status === 'pending'" class="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Review pending moderation</span>
+                        <span v-else-if="profile.employer_reviews_by_id?.[application.job?.employer?.id]?.status === 'approved'" class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">Employer reviewed</span>
+                        <button v-else-if="canReviewEmployer(application)" type="button" class="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-50" @click="toggleEmployerReview(application)">Rate employer</button>
+                        <form v-if="reviewOpenId === application.job?.employer?.id" class="w-full rounded-xl border border-slate-200 bg-slate-50 p-4" @submit.prevent="submitEmployerReview(application)">
+                            <h4 class="font-semibold text-slate-900">Review {{ application.job?.employer?.company_name }}</h4>
+                            <p class="mt-1 text-xs leading-5 text-slate-600">Reviews are shown publicly only after moderation. One review is allowed per employer.</p>
+                            <p v-if="reviewError" class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{{ reviewError }}</p>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label class="text-xs font-semibold text-slate-600">Rating<select v-model.number="reviewDrafts[application.job.employer.id].rating" required class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"><option v-for="rating in [5,4,3,2,1]" :key="rating" :value="rating">{{ rating }} / 5</option></select></label>
+                                <label class="text-xs font-semibold text-slate-600">Title (optional)<input v-model="reviewDrafts[application.job.employer.id].title" maxlength="160" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900"></label>
+                                <label class="text-xs font-semibold text-slate-600 sm:col-span-2">Your experience<textarea v-model="reviewDrafts[application.job.employer.id].review" required minlength="20" maxlength="3000" rows="3" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900" placeholder="Describe your recruitment experience (at least 20 characters)." /></label>
+                            </div>
+                            <button type="submit" :disabled="reviewSavingId === application.job.employer.id" class="mt-3 rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-50">{{ reviewSavingId === application.job.employer.id ? 'Submitting…' : 'Submit review' }}</button>
+                        </form>
                     </article>
                 </div>
                 <p v-else class="mt-5 rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">You haven’t applied to any jobs yet.</p>

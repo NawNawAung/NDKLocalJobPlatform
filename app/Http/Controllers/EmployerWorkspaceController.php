@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Application;
 use App\Models\Interview;
 use App\Models\Job;
+use App\Models\JobCategory;
 use App\Models\Notification;
 use App\Models\JobSeeker;
 use App\Services\EmployerEntitlementService;
@@ -67,7 +68,7 @@ class EmployerWorkspaceController extends Controller
                 'id' => $job->id, 'title' => $job->title, 'location' => $job->location,
                 'township' => $job->township?->name, 'status' => $job->status,
                 'posted_at' => $job->posted_at?->toIso8601String(), 'applications_count' => $job->applications_count,
-                'employment_type' => $job->employment_type, 'category' => $job->category,
+                'employment_type' => $job->employment_type, 'category' => $job->category, 'category_id' => $job->category_id,
                 'experience_level' => $job->experience_level, 'work_mode' => $job->work_mode,
                 'salary_min' => $job->salary_min, 'salary_max' => $job->salary_max,
                 'application_deadline' => $job->application_deadline?->format('Y-m-d'),
@@ -169,7 +170,8 @@ class EmployerWorkspaceController extends Controller
             'description' => ['required', 'string', 'max:20000'],
             'requirements' => ['nullable', 'string', 'max:20000'],
             'location' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', 'max:100'],
+            'category_id' => ['required_without:category', 'nullable', 'integer', Rule::exists('job_categories', 'id')->where('is_active', true)],
+            'category' => ['required_without:category_id', 'nullable', 'string', 'max:100'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time', 'contract', 'temporary', 'internship'])],
             'experience_level' => ['nullable', Rule::in(['entry', 'junior', 'mid', 'senior', 'lead', 'executive'])],
             'work_mode' => ['nullable', Rule::in(['on_site', 'hybrid', 'remote'])],
@@ -177,6 +179,11 @@ class EmployerWorkspaceController extends Controller
             'salary_max' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'application_deadline' => ['nullable', 'date', 'after:today'],
         ]);
+        $category = isset($data['category_id'])
+            ? JobCategory::where('is_active', true)->findOrFail($data['category_id'])
+            : JobCategory::where('is_active', true)->whereRaw('LOWER(name) = ?', [mb_strtolower(trim($data['category']))])->firstOrFail();
+        $data['category_id'] = $category->id;
+        $data['category'] = $category->name;
         if (isset($data['salary_min'], $data['salary_max']) && $data['salary_min'] > $data['salary_max']) {
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }
@@ -201,6 +208,7 @@ class EmployerWorkspaceController extends Controller
             'description' => ['sometimes', 'required', 'string', 'max:20000'],
             'requirements' => ['nullable', 'string', 'max:20000'],
             'location' => ['sometimes', 'required', 'string', 'max:255'],
+            'category_id' => ['sometimes', 'required', 'integer', Rule::exists('job_categories', 'id')->where('is_active', true)],
             'category' => ['sometimes', 'required', 'string', 'max:100'],
             'employment_type' => ['sometimes', Rule::in(['full_time', 'part_time', 'contract', 'temporary', 'internship'])],
             'experience_level' => ['nullable', Rule::in(['entry', 'junior', 'mid', 'senior', 'lead', 'executive'])],
@@ -210,6 +218,13 @@ class EmployerWorkspaceController extends Controller
             'application_deadline' => ['nullable', 'date', 'after:today'],
             'status' => ['sometimes', Rule::in(['published', 'paused', 'closed', 'draft'])],
         ]);
+        if (array_key_exists('category_id', $data) || array_key_exists('category', $data)) {
+            $category = isset($data['category_id']) ? JobCategory::findOrFail($data['category_id']) : JobCategory::whereRaw('LOWER(name) = ?', [mb_strtolower(trim($data['category']))])->first();
+            abort_unless($category, 422, 'Choose a valid job category.');
+            abort_if(! $category->is_active && $category->id !== $job->category_id, 422, 'New listings must use an active category.');
+            $data['category_id'] = $category->id;
+            $data['category'] = $category->name;
+        }
         $nextStatus = $data['status'] ?? $job->status;
         $nextExpiry = array_key_exists('application_deadline', $data) ? $data['application_deadline'] : $job->application_deadline;
         $willBeActive = $nextStatus === 'published' && (! $nextExpiry || ! Carbon::parse($nextExpiry)->isBefore(today()));

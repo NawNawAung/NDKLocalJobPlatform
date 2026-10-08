@@ -15,7 +15,13 @@ class JobApplicationController extends Controller
 {
     public function show(Request $request, int $jobId): JsonResponse
     {
-        $job = Job::published()->with(['employer.region:id,name', 'employer.township:id,name', 'township.region:id,name', 'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())])
+        $job = Job::published()->with([
+            'jobCategory:id,name', 'township.region:id,name',
+            'employer' => fn ($query) => $query->with(['region:id,name', 'township:id,name', 'reviews' => fn ($reviews) => $reviews->where('status', 'approved')->latest()->limit(5)])
+                ->withCount(['reviews as approved_reviews_count' => fn ($reviews) => $reviews->where('status', 'approved')])
+                ->withAvg(['reviews as approved_reviews_avg_rating' => fn ($reviews) => $reviews->where('status', 'approved')], 'rating'),
+            'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now()),
+        ])
             ->findOrFail($jobId);
         $seeker = $request->user()?->role === 'job_seeker' ? $request->user()->jobSeeker : null;
         $application = $seeker?->applications()->where('job_id', $job->id)->first();
@@ -27,7 +33,8 @@ class JobApplicationController extends Controller
                 'title' => $job->title,
                 'description' => $job->description,
                 'requirements' => $job->requirements,
-                'category' => $job->category,
+                'category' => $job->jobCategory?->name ?? $job->category,
+                'category_id' => $job->category_id,
                 'location' => $job->township ? $job->township->name.', '.$job->township->region?->name : $job->location,
                 'employment_type' => $job->employment_type,
                 'experience_level' => $job->experience_level,
@@ -47,6 +54,9 @@ class JobApplicationController extends Controller
                     'social_links' => $job->employer?->social_links ?? [],
                     'location' => collect([$job->employer?->location, $job->employer?->township?->name, $job->employer?->region?->name])->filter()->join(', '),
                     'is_verified' => (bool) $job->employer?->is_verified,
+                    'average_rating' => $job->employer?->approved_reviews_avg_rating !== null ? round((float) $job->employer->approved_reviews_avg_rating, 1) : null,
+                    'review_count' => $job->employer?->approved_reviews_count ?? 0,
+                    'reviews' => $job->employer?->reviews?->map(fn ($review) => ['rating' => $review->rating, 'title' => $review->title, 'review' => $review->review, 'created_at' => $review->created_at?->toIso8601String()]) ?? [],
                 ],
             ],
             'authenticated' => $request->user() !== null,

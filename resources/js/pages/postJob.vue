@@ -1,24 +1,34 @@
 <script setup>
-import { reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 
 const saving = ref(false);
 const error = ref('');
 const notice = ref('');
+const categories = ref([]);
+const categoriesLoading = ref(true);
 const upgradeRequired = ref(false);
 const jobDraft = window.__employerJobDraft ?? null;
 const editingId = ref(jobDraft?.id ?? null);
 const form = reactive({
-    title: '', category: '', location: '', employment_type: 'full_time',
+    title: '', category_id: '', category: '', location: '', employment_type: 'full_time',
     experience_level: '', work_mode: 'on_site', salary_min: '', salary_max: '',
     application_deadline: '', description: '', requirements: '',
 });
 if (jobDraft) Object.assign(form, {
-    title: jobDraft.title ?? '', category: jobDraft.category ?? '', location: jobDraft.location ?? '',
+    title: jobDraft.title ?? '', category_id: jobDraft.category_id ? String(jobDraft.category_id) : '', category: jobDraft.category ?? '', location: jobDraft.location ?? '',
     employment_type: jobDraft.employment_type ?? 'full_time', experience_level: jobDraft.experience_level ?? '',
     work_mode: jobDraft.work_mode ?? 'on_site', salary_min: jobDraft.salary_min ?? '', salary_max: jobDraft.salary_max ?? '',
     application_deadline: jobDraft.application_deadline ?? '', description: jobDraft.description ?? '', requirements: jobDraft.requirements ?? '',
 });
-const categories = ['Administration', 'Customer Service', 'Education', 'Engineering', 'Finance', 'Healthcare', 'Human Resources', 'Hospitality', 'Logistics', 'Marketing', 'Sales', 'Technology', 'Other'];
+async function loadCategories() {
+    categoriesLoading.value = true;
+    try {
+        const { data } = await window.axios.get('/api/job-categories');
+        categories.value = data.categories ?? [];
+        if (!form.category_id && form.category) form.category_id = String(categories.value.find((item) => item.name.toLowerCase() === form.category.toLowerCase())?.id ?? '');
+    } catch { error.value = 'Job categories could not be loaded. Refresh and try again.'; }
+    finally { categoriesLoading.value = false; }
+}
 
 async function publishJob() {
     saving.value = true;
@@ -26,6 +36,8 @@ async function publishJob() {
     notice.value = '';
     upgradeRequired.value = false;
     const payload = { ...form };
+    payload.category_id = payload.category_id ? Number(payload.category_id) : null;
+    if (payload.category_id) delete payload.category;
     for (const key of ['salary_min', 'salary_max']) payload[key] = payload[key] === '' ? null : Number(payload[key]);
     for (const key of ['experience_level', 'application_deadline', 'requirements']) if (!payload[key]) payload[key] = null;
     try {
@@ -42,6 +54,8 @@ async function publishJob() {
             : exception.response?.data?.message ?? 'Could not publish this job. Please check the fields and try again.';
     } finally { saving.value = false; }
 }
+
+onMounted(loadCategories);
 </script>
 
 <template>
@@ -54,7 +68,7 @@ async function publishJob() {
                 <p v-if="notice" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
                 <div class="grid gap-5 sm:grid-cols-2">
                     <label class="sm:col-span-2"><span class="form-label">Job title <b class="text-red-600">*</b></span><input v-model="form.title" required maxlength="255" placeholder="e.g. Senior Frontend Developer" class="form-field"></label>
-                    <label><span class="form-label">Job category <b class="text-red-600">*</b></span><select v-model="form.category" required class="form-field"><option value="" disabled>Select a category</option><option v-for="category in categories" :key="category">{{ category }}</option></select></label>
+                    <label><span class="form-label">Job category <b class="text-red-600">*</b></span><select v-model="form.category_id" required class="form-field" :disabled="categoriesLoading"><option value="" disabled>{{ categoriesLoading ? 'Loading categories…' : 'Select a category' }}</option><option v-for="category in categories" :key="category.id" :value="String(category.id)">{{ category.name }}</option></select><span v-if="!categoriesLoading && !categories.length" class="mt-1 block text-xs text-red-700">No active categories are available. Contact the platform administrator.</span></label>
                     <label><span class="form-label">Location <b class="text-red-600">*</b></span><input v-model="form.location" required maxlength="255" placeholder="Yangon, Myanmar or Remote" class="form-field"></label>
                     <label><span class="form-label">Employment type <b class="text-red-600">*</b></span><select v-model="form.employment_type" required class="form-field"><option value="full_time">Full time</option><option value="part_time">Part time</option><option value="contract">Contract</option><option value="temporary">Temporary</option><option value="internship">Internship</option></select></label>
                     <label><span class="form-label">Experience level</span><select v-model="form.experience_level" class="form-field"><option value="">Any experience</option><option value="entry">Entry level</option><option value="junior">Junior</option><option value="mid">Mid level</option><option value="senior">Senior</option><option value="lead">Lead</option><option value="executive">Executive</option></select></label>

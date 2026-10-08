@@ -21,6 +21,7 @@ class JobSeeker extends Model
     public function region(): BelongsTo { return $this->belongsTo(Region::class); }
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }
     public function applications(): HasMany { return $this->hasMany(Application::class); }
+    public function employerReviews(): HasMany { return $this->hasMany(EmployerReview::class); }
     public function savedJobs(): HasMany { return $this->hasMany(SavedJob::class); }
     public function experiences(): HasMany { return $this->hasMany(JobSeekerExperience::class)->orderBy('sort_order')->orderByDesc('started_on'); }
     public function educations(): HasMany { return $this->hasMany(JobSeekerEducation::class)->orderBy('sort_order')->orderByDesc('graduated_year'); }

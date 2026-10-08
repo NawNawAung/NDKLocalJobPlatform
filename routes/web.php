@@ -9,12 +9,16 @@ use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\JobCategoryController;
+use App\Http\Controllers\EmployerReviewController;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
 Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
+Route::get('/api/job-categories', [JobCategoryController::class, 'index'])->name('job-categories.index');
+Route::get('/api/employers/{employer}/reviews', [EmployerReviewController::class, 'publicForEmployer'])->name('employer-reviews.index');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->middleware('guest')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('guest')->name('login.store');
@@ -49,10 +53,17 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
         Route::get('/applications', [AdminController::class, 'applications'])->name('applications');
         Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
         Route::patch('/reports/{report}', [AdminController::class, 'reviewReport'])->name('reports.review');
+        Route::get('/categories', [AdminController::class, 'categories'])->name('categories');
+        Route::post('/categories', [AdminController::class, 'createCategory'])->name('categories.store');
+        Route::patch('/categories/{jobCategory}', [AdminController::class, 'updateCategory'])->name('categories.update');
+        Route::get('/employer-reviews', [AdminController::class, 'reviews'])->name('employer-reviews');
+        Route::patch('/employer-reviews/{employerReview}', [AdminController::class, 'moderateReview'])->name('employer-reviews.moderate');
+        Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
     });
     Route::get('/employer/talent', [BillingController::class, 'talent'])->name('employer.talent');
     Route::get('/employer/talent/{jobSeekerId}/resume', [BillingController::class, 'downloadTalentResume'])->whereNumber('jobSeekerId')->name('employer.talent.resume');
     Route::post('/jobs/{jobId}/applications', [JobApplicationController::class, 'apply'])->whereNumber('jobId')->middleware('throttle:10,1')->name('applications.store');
+    Route::post('/applications/{application}/employer-review', [EmployerReviewController::class, 'store'])->middleware('throttle:5,1')->name('employer-reviews.store');
     Route::post('/jobs/{jobId}/save', [JobApplicationController::class, 'save'])->whereNumber('jobId')->name('jobs.save');
     Route::delete('/jobs/{jobId}/save', [JobApplicationController::class, 'unsave'])->whereNumber('jobId')->name('jobs.unsave');
     Route::get('/employer/dashboard', [EmployerWorkspaceController::class, 'dashboard'])->name('employer.dashboard');
