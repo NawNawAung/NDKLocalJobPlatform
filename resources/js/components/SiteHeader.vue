@@ -42,7 +42,10 @@ const links = [
         { label: 'Dashboard', href: '/#dashboard' },
         { label: 'Billing', href: '/#billing' },
     ] : []),
-    ...(props.isAuthenticated && props.userRole === 'admin' ? [{ label: 'Billing review', href: '/#admin-billing' }] : []),
+    ...(props.isAuthenticated && props.userRole === 'admin' ? [
+        { label: 'Admin Dashboard', href: '/#admin' },
+        { label: 'Billing review', href: '/#admin-billing' },
+    ] : []),
     ...(props.isAuthenticated ? [{ label: 'Messages', href: '/#messages' }] : []),
 ];
 

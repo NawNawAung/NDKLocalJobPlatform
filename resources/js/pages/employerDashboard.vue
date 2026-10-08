@@ -47,6 +47,16 @@ async function saveProfile() {
     } finally { saving.value = false; }
 }
 
+async function requestVerification() {
+    saving.value = true; error.value = ''; notice.value = '';
+    try {
+        const { data } = await window.axios.post('/api/employer/verification');
+        dashboard.value.profile.verification_status = 'pending';
+        notice.value = data.message;
+    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not submit the verification request.'; }
+    finally { saving.value = false; }
+}
+
 async function updateJob(job, status) {
     error.value = '';
     try {
@@ -87,6 +97,7 @@ onMounted(loadDashboard);
 
             <p v-if="error" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }}</p>
             <p v-if="notice" class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
+            <section v-if="!loading && !dashboard.profile.is_verified" class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-4 shadow-sm"><div><p class="font-semibold text-slate-900">Company verification</p><p class="mt-1 text-sm text-slate-600">{{ dashboard.profile.verification_status === 'pending' ? 'Your request is awaiting platform review.' : dashboard.profile.verification_status === 'rejected' ? 'The previous request was not approved. Update company details before requesting another review.' : 'Request a review to display a verified employer badge.' }}</p></div><button v-if="dashboard.profile.verification_status !== 'pending'" type="button" :disabled="saving" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-50" @click="requestVerification">Request verification</button><span v-else class="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Pending review</span></section>
             <div v-if="loading" class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading your dashboard…</div>
             <template v-else>
                 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

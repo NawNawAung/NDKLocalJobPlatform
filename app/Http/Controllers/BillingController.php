@@ -36,13 +36,13 @@ class BillingController extends Controller
 
     private function employer(Request $request): Employer
     {
-        abort_unless($request->user()->role === 'employer' && $request->user()->employer, 403);
+        abort_unless($request->user()->status && $request->user()->role === 'employer' && $request->user()->employer, 403);
         return $request->user()->employer;
     }
 
     private function admin(Request $request): User
     {
-        abort_unless($request->user()->role === 'admin', 403);
+        abort_unless($request->user()->status && $request->user()->role === 'admin', 403);
         return $request->user();
     }
 

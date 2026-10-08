@@ -40,6 +40,7 @@ class JobApplicationController extends Controller
                 'is_featured' => $job->promotions->contains('promotion_type', 'featured'),
                 'promotion_labels' => $job->promotions->pluck('promotion_type')->unique()->values(),
                 'company' => [
+                    'employer_id' => $job->employer?->id,
                     'name' => $job->employer?->company_name,
                     'description' => $job->employer?->company_description,
                     'website_url' => $job->employer?->website_url,

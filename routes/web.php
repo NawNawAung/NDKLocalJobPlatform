@@ -8,10 +8,11 @@ use App\Http\Controllers\EmployerWorkspaceController;
 use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\AdminController;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
-Route::get('/profile', [AuthController::class, 'profilePage'])->middleware('auth')->name('profile.page');
+Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
 
@@ -20,10 +21,11 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('guest')->na
 Route::get('/register', [AuthController::class, 'showRegister'])->middleware('guest')->name('register');
 Route::post('/register', [AuthController::class, 'register'])->middleware('guest')->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
-Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('auth')->name('profile.update');
-Route::get('/profile/resume', [AuthController::class, 'downloadResume'])->middleware('auth')->name('profile.resume');
+Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware(['auth', 'active.account'])->name('profile.update');
+Route::get('/profile/resume', [AuthController::class, 'downloadResume'])->middleware(['auth', 'active.account'])->name('profile.resume');
 
-Route::middleware('auth')->prefix('api')->group(function () {
+Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () {
+    Route::post('/reports', [AdminController::class, 'report'])->middleware('throttle:5,1')->name('reports.store');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
@@ -36,6 +38,18 @@ Route::middleware('auth')->prefix('api')->group(function () {
     Route::get('/admin/billing/payments/{payment}/proof', [BillingController::class, 'paymentProof'])->name('admin.billing.payments.proof');
     Route::patch('/admin/billing/payments/{payment}/review', [BillingController::class, 'reviewPayment'])->name('admin.billing.payments.review');
     Route::post('/admin/billing/payments/{payment}/refunds', [BillingController::class, 'recordRefund'])->name('admin.billing.payments.refunds.store');
+    Route::prefix('/admin')->name('admin.')->group(function () {
+        Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+        Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::patch('/users/{user}', [AdminController::class, 'updateUser'])->name('users.update');
+        Route::get('/employers', [AdminController::class, 'employers'])->name('employers');
+        Route::patch('/employers/{employer}/verification', [AdminController::class, 'reviewEmployer'])->name('employers.verification');
+        Route::get('/jobs', [AdminController::class, 'jobs'])->name('jobs');
+        Route::patch('/jobs/{job}/moderation', [AdminController::class, 'moderateJob'])->name('jobs.moderation');
+        Route::get('/applications', [AdminController::class, 'applications'])->name('applications');
+        Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+        Route::patch('/reports/{report}', [AdminController::class, 'reviewReport'])->name('reports.review');
+    });
     Route::get('/employer/talent', [BillingController::class, 'talent'])->name('employer.talent');
     Route::get('/employer/talent/{jobSeekerId}/resume', [BillingController::class, 'downloadTalentResume'])->whereNumber('jobSeekerId')->name('employer.talent.resume');
     Route::post('/jobs/{jobId}/applications', [JobApplicationController::class, 'apply'])->whereNumber('jobId')->middleware('throttle:10,1')->name('applications.store');
@@ -43,6 +57,7 @@ Route::middleware('auth')->prefix('api')->group(function () {
     Route::delete('/jobs/{jobId}/save', [JobApplicationController::class, 'unsave'])->whereNumber('jobId')->name('jobs.unsave');
     Route::get('/employer/dashboard', [EmployerWorkspaceController::class, 'dashboard'])->name('employer.dashboard');
     Route::patch('/employer/profile', [EmployerWorkspaceController::class, 'updateProfile'])->name('employer.profile.update');
+    Route::post('/employer/verification', [EmployerWorkspaceController::class, 'requestVerification'])->middleware('throttle:5,1')->name('employer.verification.request');
     Route::get('/employer/candidates', [EmployerWorkspaceController::class, 'candidates'])->name('employer.candidates');
     Route::post('/employer/jobs', [EmployerWorkspaceController::class, 'createJob'])->name('employer.jobs.store');
     Route::patch('/employer/jobs/{job}', [EmployerWorkspaceController::class, 'updateJob'])->name('employer.jobs.update');

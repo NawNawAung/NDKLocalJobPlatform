@@ -20,7 +20,7 @@ class EmployerWorkspaceController extends Controller
 
     private function employer(Request $request)
     {
-        abort_unless($request->user()->role === 'employer' && $request->user()->employer, 403);
+        abort_unless($request->user()->status && $request->user()->role === 'employer' && $request->user()->employer, 403);
         return $request->user()->employer;
     }
 
@@ -55,6 +55,7 @@ class EmployerWorkspaceController extends Controller
                 'region' => $employer->region?->name,
                 'township' => $employer->township?->name,
                 'is_verified' => $employer->is_verified,
+                'verification_status' => $employer->verification_status ?? ($employer->is_verified ? 'verified' : 'unverified'),
             ],
             'stats' => [
                 'active_jobs' => Job::published()->where('employer_id', $employer->id)->count(),
@@ -111,6 +112,14 @@ class EmployerWorkspaceController extends Controller
         return response()->json(['message' => 'Company profile updated.']);
     }
 
+    public function requestVerification(Request $request): JsonResponse
+    {
+        $employer = $this->employer($request);
+        if ($employer->is_verified) return response()->json(['message' => 'This employer is already verified.']);
+        $employer->update(['verification_status' => 'pending', 'verification_requested_at' => now(), 'verification_notes' => null]);
+        return response()->json(['message' => 'Verification request submitted for review.']);
+    }
+
     public function candidates(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
@@ -138,6 +147,7 @@ class EmployerWorkspaceController extends Controller
                 'cover_letter' => $application->cover_letter,
                 'candidate' => [
                     'name' => $application->jobSeeker?->user?->name,
+                    'user_id' => $application->jobSeeker?->user_id,
                     'email' => $application->jobSeeker?->user?->email,
                     'title' => $application->jobSeeker?->professional_title,
                     'experience' => $application->jobSeeker?->years_experience,
