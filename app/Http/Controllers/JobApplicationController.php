@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Job;
 use App\Models\Notification;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +105,9 @@ class JobApplicationController extends Controller
             });
         } catch (\Throwable $exception) {
             if ($storedPath) Storage::disk('local')->delete($storedPath);
+            if ($exception instanceof UniqueConstraintViolationException) {
+                throw ValidationException::withMessages(['application' => 'You have already applied for this job.']);
+            }
             throw $exception;
         }
 

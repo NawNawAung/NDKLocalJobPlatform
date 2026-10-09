@@ -11,6 +11,17 @@ class Employer extends Model
     protected $fillable = ['user_id', 'region_id', 'township_id', 'company_name', 'company_description', 'location', 'website_url', 'social_links', 'is_verified', 'verification_status', 'verification_notes', 'verification_requested_at', 'verification_reviewed_at', 'verification_reviewed_by'];
     protected function casts(): array { return ['is_verified' => 'boolean', 'social_links' => 'array', 'verification_requested_at' => 'datetime', 'verification_reviewed_at' => 'datetime']; }
 
+    /**
+     * Keep the legacy boolean readable while making the richer status column
+     * authoritative wherever it exists. This also supports rolling deploys
+     * against databases that have not yet received the status migration.
+     */
+    public function getIsVerifiedAttribute(mixed $value): bool
+    {
+        $status = $this->attributes['verification_status'] ?? null;
+        return $status !== null ? $status === 'verified' : (bool) $value;
+    }
+
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function region(): BelongsTo { return $this->belongsTo(Region::class); }
     public function township(): BelongsTo { return $this->belongsTo(Township::class); }

@@ -9,6 +9,7 @@ use App\Models\Job;
 use App\Models\JobCategory;
 use App\Models\JobSeeker;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -75,9 +76,71 @@ class EmployerReviewsAndCategoriesTest extends TestCase
         $this->actingAs($records['employerUser'])->getJson('/api/jobs/search?category_id='.$records['category']->id)->assertOk();
         $this->actingAs($admin)->patchJson("/api/admin/categories/{$records['category']->id}", ['name' => 'Software Engineering'])->assertOk();
         $this->assertDatabaseHas('job_listings', ['id' => $records['job']->id, 'category' => 'Software Engineering', 'category_id' => $records['category']->id]);
+        $viewer = $this->account('Search Viewer', 'job_seeker');
+        JobSeeker::create(['user_id' => $viewer->id, 'status' => true]);
+        $this->actingAs($viewer)->getJson('/api/jobs/search?category=Software%20Engineering')->assertOk()->assertJsonPath('data.0.id', $records['job']->id);
+        $this->actingAs($viewer)->getJson('/api/jobs/search?category_id='.$records['category']->id)->assertOk()->assertJsonPath('data.0.id', $records['job']->id);
         $this->actingAs($admin)->patchJson("/api/admin/categories/{$financeId}", ['is_active' => false])->assertOk();
         $this->getJson('/api/job-categories')->assertOk()->assertJsonMissing(['id' => $financeId]);
         $this->assertDatabaseHas('admin_audit_logs', ['administrator_id' => $admin->id, 'action' => 'job_category.updated']);
+    }
+
+    public function test_database_enforces_one_application_per_job_and_job_seeker(): void
+    {
+        $records = $this->reviewableApplication();
+        $this->actingAs($records['seekerUser'])
+            ->postJson("/api/jobs/{$records['job']->id}/applications", [])
+            ->assertUnprocessable();
+
+        $this->expectException(UniqueConstraintViolationException::class);
+        Application::create([
+            'job_id' => $records['job']->id,
+            'job_seeker_id' => $records['seeker']->id,
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+    }
+
+    public function test_application_uniqueness_migration_refuses_duplicate_data_and_rolls_back_without_deleting_it(): void
+    {
+        $records = $this->reviewableApplication();
+        $migration = require database_path('migrations/2026_10_10_000000_enforce_unique_job_applications.php');
+        $migration->down();
+
+        Application::create([
+            'job_id' => $records['job']->id,
+            'job_seeker_id' => $records['seeker']->id,
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+
+        try {
+            $migration->up();
+            $this->fail('The migration must refuse to add uniqueness while duplicates exist.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('duplicate application groups exist', $exception->getMessage());
+        }
+
+        $this->assertSame(2, Application::query()
+            ->where('job_id', $records['job']->id)
+            ->where('job_seeker_id', $records['seeker']->id)
+            ->count());
+    }
+
+    public function test_verification_status_overrides_legacy_boolean_when_present(): void
+    {
+        $user = $this->account('Verification Contact', 'employer');
+        $employer = Employer::create([
+            'user_id' => $user->id,
+            'company_name' => 'Verification Example',
+            'is_verified' => true,
+            'verification_status' => 'pending',
+        ]);
+
+        $this->assertFalse($employer->fresh()->is_verified);
+
+        $employer->update(['is_verified' => false, 'verification_status' => 'verified']);
+        $this->assertTrue($employer->fresh()->is_verified);
     }
 
     public function test_category_backfill_migration_preserves_legacy_listing_values(): void

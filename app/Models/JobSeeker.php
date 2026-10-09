@@ -32,7 +32,9 @@ class JobSeeker extends Model
             ->when($filters['keyword'] ?? null, fn (Builder $query, string $keyword) => $query->where(fn (Builder $q) => $q->where('title', 'like', "%{$keyword}%")->orWhere('description', 'like', "%{$keyword}%")))
             ->when($filters['township_id'] ?? null, fn (Builder $query, int $townshipId) => $query->where('township_id', $townshipId))
             ->when($filters['location'] ?? null, fn (Builder $query, string $location) => $query->where('location', 'like', "%{$location}%"))
-            ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where('category', $category));
+            ->when($filters['category'] ?? null, fn (Builder $query, string $category) => $query->where(fn (Builder $match) => $match
+                ->whereHas('jobCategory', fn (Builder $related) => $related->where('name', $category))
+                ->orWhere('category', $category)));
     }
 
     public function applyForJob(Job $job, array $attributes = []): Application

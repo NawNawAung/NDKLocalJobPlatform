@@ -65,7 +65,13 @@ class JobSearchController extends Controller
                 });
             })
             ->when($filters['category_id'] ?? null, fn (Builder $query, int $categoryId) => $query->where('category_id', $categoryId))
-            ->when(! isset($filters['category_id']) && ($filters['category'] ?? null), fn (Builder $query, string $category) => $query->where('category', 'like', "%{$category}%"))
+            ->when(! isset($filters['category_id']) ? ($filters['category'] ?? null) : null, function (Builder $query, string $category) {
+                // Keep accepting the legacy category-name filter for older
+                // clients, but resolve canonical records through category_id.
+                $query->where(fn (Builder $match) => $match
+                    ->whereHas('jobCategory', fn (Builder $related) => $related->where('name', 'like', "%{$category}%"))
+                    ->orWhere('category', 'like', "%{$category}%"));
+            })
             ->when($filters['employment_type'] ?? null, fn (Builder $query, string $type) => $query->where('employment_type', $type))
             ->when($filters['experience_level'] ?? null, fn (Builder $query, string $level) => $query->where('experience_level', $level))
             ->when($filters['work_mode'] ?? null, fn (Builder $query, string $mode) => $query->where('work_mode', $mode))

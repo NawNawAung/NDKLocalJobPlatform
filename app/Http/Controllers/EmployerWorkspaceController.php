@@ -290,7 +290,7 @@ class EmployerWorkspaceController extends Controller
     private function notifyJobAlertSubscribers(Job $job): void
     {
         $companyName = $job->employer?->company_name ?: 'An employer';
-        $actionUrl = '/jobs?category='.rawurlencode($job->category);
+        $actionUrl = '/jobs?category_id='.(int) $job->category_id;
 
         JobSeeker::query()
             ->where('status', true)
