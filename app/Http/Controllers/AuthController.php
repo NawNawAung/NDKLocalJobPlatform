@@ -36,6 +36,16 @@ class AuthController extends Controller
         return $this->appView('login');
     }
 
+    public function showAdminLogin(): View
+    {
+        return $this->appView('login', 'home', true);
+    }
+
+    public function adminPage(): View
+    {
+        return $this->appView(null, 'admin');
+    }
+
     public function showRegister(): View
     {
         return $this->appView('register');
@@ -59,6 +69,22 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
         return redirect()->intended('/');
+    }
+
+    public function loginAdmin(Request $request): RedirectResponse
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        if (! Auth::attempt([...$credentials, 'role' => 'admin', 'status' => true])) {
+            return back()->withErrors(['email' => 'The supplied administrator credentials are incorrect or inactive.'])->onlyInput('email');
+        }
+
+        $request->session()->regenerate();
+
+        return redirect()->intended(route('admin.home'));
     }
 
     public function register(Request $request): RedirectResponse
@@ -295,7 +321,7 @@ class AuthController extends Controller
         return Storage::disk('local')->download($jobSeeker->cv_path, basename($jobSeeker->cv_original_name ?: $jobSeeker->cv_path));
     }
 
-    private function appView(?string $authPage = null, string $page = 'home'): View
+    private function appView(?string $authPage = null, string $page = 'home', bool $adminLogin = false): View
     {
         $user = Auth::user();
         $seekerProfile = null;
@@ -317,6 +343,7 @@ class AuthController extends Controller
         $authBootstrap = [
             'authPage' => $authPage,
             'page' => $page,
+            'adminLogin' => $adminLogin,
             'authenticated' => Auth::check(),
             'role' => Auth::user()?->role,
             'profile' => $seekerProfile,

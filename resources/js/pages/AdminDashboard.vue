@@ -110,7 +110,7 @@ onMounted(load);
         <div class="mx-auto max-w-7xl">
             <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div><p class="text-sm font-semibold text-[var(--brand-primary)]">Platform administration</p><h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Admin dashboard</h1><p class="mt-2 text-sm text-slate-600">Manage platform accounts, listings, employer verification, and reports.</p></div>
-                <a href="/#admin-billing" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="ti ti-receipt" aria-hidden="true"/>Payment review</a>
+                <a href="/admin#admin-billing" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="ti ti-receipt" aria-hidden="true"/>Payment review</a>
             </header>
             <div class="mb-6 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2" role="tablist" aria-label="Administration sections">
                 <button v-for="item in tabs" :key="item.id" type="button" role="tab" :aria-selected="tab === item.id" class="inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-semibold transition" :class="tab === item.id ? 'bg-blue-50 text-blue-900 ring-1 ring-blue-100' : 'text-slate-600 hover:bg-slate-50'" @click="switchTab(item.id)"><i :class="item.icon" aria-hidden="true"/>{{ item.label }}</button>

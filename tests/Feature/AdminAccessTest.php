@@ -34,6 +34,44 @@ class AdminAccessTest extends TestCase
         $this->actingAs($admin)->getJson('/api/admin/dashboard')->assertForbidden();
     }
 
+    public function test_admin_browser_entry_requires_an_active_administrator(): void
+    {
+        $candidate = User::create(['name' => 'Candidate', 'email' => 'admin-page-candidate@example.test', 'password' => 'password123', 'role' => 'job_seeker', 'status' => true]);
+        $admin = User::create(['name' => 'Platform Admin', 'email' => 'admin-page@example.test', 'password' => 'password123', 'role' => 'admin', 'status' => true]);
+
+        $this->get('/admin')->assertRedirect('/login')->assertSessionHas('url.intended');
+        $this->actingAs($candidate)->get('/admin')->assertForbidden();
+        $this->actingAs($admin)->get('/admin')->assertOk()->assertViewHas('authBootstrap.page', 'admin');
+    }
+
+    public function test_dedicated_admin_login_accepts_only_active_admin_credentials(): void
+    {
+        $admin = User::create(['name' => 'Platform Admin', 'email' => 'admin-login@example.test', 'password' => 'password123', 'role' => 'admin', 'status' => true]);
+        $candidate = User::create(['name' => 'Candidate', 'email' => 'candidate-login@example.test', 'password' => 'password123', 'role' => 'job_seeker', 'status' => true]);
+        $inactiveAdmin = User::create(['name' => 'Inactive Admin', 'email' => 'inactive-login@example.test', 'password' => 'password123', 'role' => 'admin', 'status' => false]);
+
+        $this->get('/admin/login')->assertOk()->assertViewHas('authBootstrap.adminLogin', true);
+        $this->post('/admin/login', ['email' => $candidate->email, 'password' => 'password123'])->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->post('/admin/login', ['email' => $inactiveAdmin->email, 'password' => 'password123'])->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->post('/admin/login', ['email' => $admin->email, 'password' => 'password123'])->assertRedirect('/admin');
+        $this->assertAuthenticatedAs($admin);
+    }
+
+    public function test_public_registration_cannot_assign_the_admin_role(): void
+    {
+        $this->post('/register', [
+            'name' => 'Public Admin',
+            'email' => 'public-admin@example.test',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'role' => 'admin',
+        ])->assertSessionHasErrors('role');
+
+        $this->assertDatabaseMissing('users', ['email' => 'public-admin@example.test']);
+    }
+
     public function test_admin_can_review_employer_and_moderate_a_job(): void
     {
         $admin = User::create(['name' => 'Platform Admin', 'email' => 'admin-review@example.test', 'password' => 'password123', 'role' => 'admin', 'status' => true]);

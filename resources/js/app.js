@@ -48,6 +48,7 @@ createApp({
             if (authBootstrap.authPage === 'login') return LoginPage;
             if (authBootstrap.authPage === 'register') return RegisterPage;
             if (authBootstrap.page === 'profile') return JobSeekerProfile;
+            if (authBootstrap.page === 'admin' && !currentHash.value) return AdminDashboard;
             if (authBootstrap.page === 'search' && !currentHash.value) return JobSearch;
             const employerPages = ['#post-job', '#pipeline', '#dashboard', '#billing', '#talent'];
             const jobSeekerPages = ['#skills-assessment'];

@@ -43,13 +43,15 @@ const links = [
         { label: 'Billing', href: '/#billing' },
     ] : []),
     ...(props.isAuthenticated && props.userRole === 'admin' ? [
-        { label: 'Admin Dashboard', href: '/#admin' },
-        { label: 'Billing review', href: '/#admin-billing' },
+        { label: 'Admin Dashboard', href: '/admin' },
+        { label: 'Billing review', href: '/admin#admin-billing' },
     ] : []),
     ...(props.isAuthenticated ? [{ label: 'Messages', href: '/#messages' }] : []),
 ];
 
 function isActive(link) {
+    if (link.href === '/admin') return currentPath.value === '/admin' && !currentHash.value;
+    if (link.href.startsWith('/admin#')) return currentPath.value === '/admin' && currentHash.value === link.href.slice('/admin'.length);
     if (link.href === '/profile') return currentPath.value === '/profile' || currentHash.value === '#profile';
     if (link.href === '/') {
         return currentPath.value === '/' && !currentHash.value && pageType !== 'search';

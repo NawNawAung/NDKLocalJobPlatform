@@ -22,6 +22,9 @@ Route::get('/api/employers/{employer}/reviews', [EmployerReviewController::class
 
 Route::get('/login', [AuthController::class, 'showLogin'])->middleware('guest')->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('guest')->name('login.store');
+Route::get('/admin/login', [AuthController::class, 'showAdminLogin'])->middleware('guest')->name('admin.login');
+Route::post('/admin/login', [AuthController::class, 'loginAdmin'])->middleware(['guest', 'throttle:5,1'])->name('admin.login.store');
+Route::get('/admin', [AuthController::class, 'adminPage'])->middleware(['auth', 'active.account', 'admin'])->name('admin.home');
 Route::get('/register', [AuthController::class, 'showRegister'])->middleware('guest')->name('register');
 Route::post('/register', [AuthController::class, 'register'])->middleware('guest')->name('register.store');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
@@ -39,11 +42,11 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
     Route::patch('/employer/billing/orders/{order}/cancel', [BillingController::class, 'cancelOrder'])->name('employer.billing.orders.cancel');
     Route::post('/employer/billing/orders/{order}/payments', [BillingController::class, 'submitPayment'])->middleware('throttle:5,1')->name('employer.billing.payments.store');
     Route::get('/billing/invoices/{invoice}', [BillingController::class, 'invoice'])->name('billing.invoices.show');
-    Route::get('/admin/billing/payments', [BillingController::class, 'adminPayments'])->name('admin.billing.payments');
-    Route::get('/admin/billing/payments/{payment}/proof', [BillingController::class, 'paymentProof'])->name('admin.billing.payments.proof');
-    Route::patch('/admin/billing/payments/{payment}/review', [BillingController::class, 'reviewPayment'])->name('admin.billing.payments.review');
-    Route::post('/admin/billing/payments/{payment}/refunds', [BillingController::class, 'recordRefund'])->name('admin.billing.payments.refunds.store');
-    Route::prefix('/admin')->name('admin.')->group(function () {
+    Route::middleware('admin')->prefix('/admin')->name('admin.')->group(function () {
+        Route::get('/billing/payments', [BillingController::class, 'adminPayments'])->name('billing.payments');
+        Route::get('/billing/payments/{payment}/proof', [BillingController::class, 'paymentProof'])->name('billing.payments.proof');
+        Route::patch('/billing/payments/{payment}/review', [BillingController::class, 'reviewPayment'])->name('billing.payments.review');
+        Route::post('/billing/payments/{payment}/refunds', [BillingController::class, 'recordRefund'])->name('billing.payments.refunds.store');
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
         Route::get('/users', [AdminController::class, 'users'])->name('users');
         Route::patch('/users/{user}', [AdminController::class, 'updateUser'])->name('users.update');
