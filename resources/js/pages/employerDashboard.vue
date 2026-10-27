@@ -5,7 +5,7 @@ const loading = ref(true);
 const saving = ref(false);
 const error = ref('');
 const notice = ref('');
-const profileEditing = ref(false);
+const profileEditing = ref(window.location.hash.includes('editProfile=1'));
 const dashboard = ref({ profile: {}, stats: {}, jobs: [], recent_applicants: [], upcoming_interviews: [] });
 const profileForm = reactive({ name: '', email: '', company_name: '', company_description: '', location: '', website_url: '', social_links: { linkedin: '', github: '', facebook: '', instagram: '', x: '' } });
 const jobs = computed(() => dashboard.value.jobs ?? []);

@@ -61,7 +61,14 @@ createApp({
         });
 
         return () => h('div', { class: 'min-h-screen bg-slate-50 text-slate-900' }, [
-            h(SiteHeader, { isAuthenticated: authBootstrap.authenticated, csrfToken: authBootstrap.csrfToken, userRole: authBootstrap.role }),
+            h(SiteHeader, {
+                isAuthenticated: authBootstrap.authenticated,
+                csrfToken: authBootstrap.csrfToken,
+                userRole: authBootstrap.role,
+                userName: authBootstrap.userName,
+                userEmail: authBootstrap.userEmail,
+                profilePhotoUrl: authBootstrap.profilePhotoUrl,
+            }),
             h('main', { id: 'page-content' }, [h(currentPage.value)]),
             h(SiteFooter, { isAuthenticated: authBootstrap.authenticated, userRole: authBootstrap.role }),
         ]);

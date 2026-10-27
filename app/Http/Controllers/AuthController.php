@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -204,7 +205,7 @@ class AuthController extends Controller
         return redirect('/');
     }
 
-    public function updateProfile(Request $request): RedirectResponse
+    public function updateProfile(Request $request): RedirectResponse|JsonResponse
     {
         $user = $request->user();
         abort_unless($user->role === 'job_seeker' && $user->jobSeeker, 403);
@@ -311,6 +312,22 @@ class AuthController extends Controller
         if ($request->hasFile('profile_photo') && $previousPhoto) Storage::disk('public')->delete($previousPhoto);
         if ($request->hasFile('cv') && $previousResume) Storage::disk('local')->delete($previousResume);
 
+        if ($request->expectsJson()) {
+            $freshProfile = $jobSeeker->fresh()->load([
+                'region:id,name,type', 'township:id,name', 'experiences', 'educations',
+            ]);
+            $profileData = $freshProfile->toArray();
+            $profileData['user'] = $user->fresh()->only(['name', 'email']);
+            $profileData['profile_photo_url'] = $freshProfile->profile_photo_path
+                ? Storage::disk('public')->url($freshProfile->profile_photo_path)
+                : null;
+
+            return response()->json([
+                'message' => 'Your profile has been saved.',
+                'profile' => $profileData,
+            ]);
+        }
+
         return redirect('/profile')->with('status', 'Your profile has been saved.');
     }
 
@@ -345,7 +362,12 @@ class AuthController extends Controller
             'page' => $page,
             'adminLogin' => $adminLogin,
             'authenticated' => Auth::check(),
-            'role' => Auth::user()?->role,
+            'role' => $user?->role,
+            'userName' => $user?->name,
+            'userEmail' => $user?->email,
+            'profilePhotoUrl' => $user?->role === 'job_seeker' && $user->jobSeeker?->profile_photo_path
+                ? Storage::disk('public')->url($user->jobSeeker->profile_photo_path)
+                : null,
             'profile' => $seekerProfile,
             'status' => session('status'),
             'csrfToken' => csrf_token(),
