@@ -10,12 +10,14 @@ use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\JobCategoryController;
 use App\Http\Controllers\JobSearchController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SalaryInsightsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
 Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
+Route::get('/api/salary-insights', SalaryInsightsController::class)->name('salary-insights.index');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
 Route::get('/api/job-categories', [JobCategoryController::class, 'index'])->name('job-categories.index');
 Route::get('/api/employers/{employer}/reviews', [EmployerReviewController::class, 'publicForEmployer'])->name('employer-reviews.index');

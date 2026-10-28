@@ -1,28 +1,111 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 
-const benchmarkSearch = ref('');
-const benchmarkSector = ref('');
-const benchmarkExperience = ref('');
-const benchmarkLocation = ref('');
-const benchmarkCategory = ref('');
-const benchmarkRole = ref('');
-const selectedDataSource = ref('cci');
-const dataSources = [
-    { id: 'cci', name: 'CCI France Myanmar · 2025 HR Survey', detail: 'Annual compensation survey with Yever; 326 responses and 141 validated submissions. Use the report year and sample when citing it.', url: 'https://www.ccifrance-myanmar.org/sites/ccifrance-myanmar.org/files/fmcci_mmhr_survey_2025_intro_vf.pdf', link: 'Open survey summary' },
-    { id: 'jobnet', name: 'JobNet · Online Salary Survey', detail: 'Employer compensation data with salary and benefits reporting. Sample and coverage figures are provider-reported; check the collection period.', url: 'https://www.jobnet.com.mm/employers/blog/hr-hiring-recruitment/2024/November/jobnet-product-update-advanced-ai-cv-match-faster-ats-cv-screening-filters-increased-marketing-spend', link: 'About the survey' },
-    { id: 'legal', name: 'Official labor and tax rules', detail: 'Use current government laws, notifications, and guidance for minimum wage, overtime, SSB, and PIT.', url: 'https://www.mol.gov.mm/laws-and-regulations/', link: 'Ministry of Labour laws' },
-];
-const activeDataSource = computed(() => dataSources.find((source) => source.id === selectedDataSource.value) || dataSources[0]);
-const benchmarkCategories = ['Management', 'Sales & Marketing', 'Supply Chain', 'Technology', 'Human Resources', 'International'];
-const benchmarkCategoryFor = (role) => {
-    if (/human resources|hr |chro/i.test(role)) return 'Human Resources';
-    if (/supply chain|demand planner|operations/i.test(role)) return 'Supply Chain';
-    if (/engineer|technical support/i.test(role)) return 'Technology';
-    if (/remote|recruiter/i.test(role)) return 'International';
-    if (/sales|channel/i.test(role)) return 'Sales & Marketing';
-    return 'Management';
-};
+const explorerFilters = reactive({ keyword: '', title: '', experience_level: '', location: '', category_id: '', currency: '' });
+const salaryExplorer = ref(null);
+const salaryExplorerLoading = ref(true);
+const salaryExplorerError = ref('');
+const comparisonType = ref('title');
+const comparisonFirst = ref('');
+const comparisonSecond = ref('');
+const personalSalary = ref('');
+let explorerTimer;
+let explorerController;
+let explorerRequest = 0;
+
+const comparisonOptions = computed(() => {
+    const options = salaryExplorer.value?.options;
+    if (!options) return [];
+    return comparisonType.value === 'category'
+        ? options.categories.map((category) => ({ value: String(category.id), label: category.name }))
+        : options.titles.map((title) => ({ value: title, label: title }));
+});
+const comparisonMaximum = computed(() => Math.max(0, ...(salaryExplorer.value?.comparison ?? []).map(({ summary }) => summary.median_salary ?? summary.maximum_salary ?? 0)));
+const personalSalaryResult = computed(() => {
+    const entered = Number(personalSalary.value);
+    const summary = salaryExplorer.value?.summary;
+    if (!Number.isFinite(entered) || entered <= 0 || !summary?.sample_size || summary.minimum_salary === null || summary.maximum_salary === null) return null;
+    const position = entered < summary.minimum_salary ? 'below' : entered > summary.maximum_salary ? 'above' : 'within';
+    return { position, sampleSize: summary.sample_size };
+});
+
+function salaryAmount(value, currency = salaryExplorer.value?.filters.currency || 'MMK') {
+    return value === null || value === undefined ? '—' : `${currency} ${Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+function salaryRange(job) {
+    const minimum = job.salary_min ? salaryAmount(job.salary_min, job.currency) : null;
+    const maximum = job.salary_max ? salaryAmount(job.salary_max, job.currency) : null;
+    if (minimum && maximum) return `${minimum} – ${maximum} / month`;
+    if (minimum) return `From ${minimum} / month`;
+    if (maximum) return `Up to ${maximum} / month`;
+    return 'Salary not disclosed';
+}
+
+function scheduleSalaryExplorerLoad() {
+    clearTimeout(explorerTimer);
+    explorerTimer = setTimeout(loadSalaryExplorer, 250);
+}
+
+async function loadSalaryExplorer() {
+    const requestId = ++explorerRequest;
+    explorerController?.abort();
+    explorerController = new AbortController();
+    salaryExplorerLoading.value = true;
+    salaryExplorerError.value = '';
+
+    const params = new URLSearchParams();
+    Object.entries(explorerFilters).forEach(([key, value]) => { if (value !== '') params.set(key, value); });
+    if (comparisonFirst.value && comparisonSecond.value && comparisonFirst.value !== comparisonSecond.value) {
+        params.set('compare_by', comparisonType.value);
+        params.set('compare_a', comparisonFirst.value);
+        params.set('compare_b', comparisonSecond.value);
+    }
+
+    try {
+        const response = await fetch(`/api/salary-insights?${params}`, {
+            headers: { Accept: 'application/json' },
+            signal: explorerController.signal,
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.message || 'Salary information could not be loaded.');
+        if (requestId !== explorerRequest) return;
+        salaryExplorer.value = payload;
+        if (!explorerFilters.currency && payload.filters.currency) explorerFilters.currency = payload.filters.currency;
+
+        if (!comparisonFirst.value || !comparisonSecond.value || comparisonFirst.value === comparisonSecond.value) {
+            const values = comparisonOptions.value.map((option) => option.value);
+            if (values.length >= 2) {
+                comparisonFirst.value = values[0];
+                comparisonSecond.value = values[1];
+            }
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError' && requestId === explorerRequest) salaryExplorerError.value = error.message || 'Salary information could not be loaded.';
+    } finally {
+        if (requestId === explorerRequest) salaryExplorerLoading.value = false;
+    }
+}
+
+function resetSalaryFilters() {
+    Object.assign(explorerFilters, { keyword: '', title: '', experience_level: '', location: '', category_id: '', currency: '' });
+    comparisonType.value = 'title';
+    comparisonFirst.value = '';
+    comparisonSecond.value = '';
+}
+
+watch(explorerFilters, scheduleSalaryExplorerLoad);
+watch([comparisonType, comparisonFirst, comparisonSecond], scheduleSalaryExplorerLoad);
+watch(comparisonType, () => {
+    const values = comparisonOptions.value.map((option) => option.value);
+    comparisonFirst.value = values[0] ?? '';
+    comparisonSecond.value = values[1] ?? '';
+});
+onMounted(loadSalaryExplorer);
+onUnmounted(() => {
+    clearTimeout(explorerTimer);
+    explorerController?.abort();
+});
 const grossMonthlyPay = ref(1500000);
 const directHousingValue = ref(0);
 const hasTaxDependentSpouse = ref(false);
@@ -84,54 +167,6 @@ const complianceDailyWage = ref(7800);
 const isBelowMinimumWage = computed(() => Number(complianceDailyWage.value) > 0 && Number(complianceDailyWage.value) < 7800);
 const formatMmk = (value) => `MMK ${Math.round(value || 0).toLocaleString('en-US')}`;
 
-const salaryBenchmarks = [
-    { sector: 'Pharmaceuticals & Healthcare', role: 'National Sales Manager', experience: 'Senior Management', salary: 'MMK 3,500,000 – 4,500,000', benefits: 'KPI bonuses, vehicle/fuel allowance, private health insurance', currency: 'MMK' },
-    { sector: 'Pharmaceuticals & Healthcare', role: 'Regulatory Manager', experience: 'Mid-Senior Level', salary: 'MMK 1,800,000 – 2,000,000', benefits: 'Medical allowance, discretionary annual bonus', currency: 'MMK' },
-    { sector: 'Supply Chain & Logistics', role: 'Senior Manager, Production Operations', experience: 'Executive / Senior', salary: 'MMK 3,000,000 – 3,700,000', benefits: 'Corporate vehicle, performance bonus, health cover', currency: 'MMK' },
-    { sector: 'Supply Chain & Logistics', role: 'Regional Operations Manager', experience: 'Senior Manager', salary: 'MMK 2,000,000 – 2,500,000', benefits: 'Mobile allowance, travel reimbursements', currency: 'MMK' },
-    { sector: 'Supply Chain & Logistics', role: 'Demand Planner / Supply Chain Manager', experience: 'Mid-Level', salary: 'MMK 1,200,000 – 1,500,000', benefits: 'Attendance allowance, overtime eligibility', currency: 'MMK' },
-    { sector: 'Technology & IT Solutions', role: 'Technical Support & Presales Engineer', experience: 'Professional / Mid', salary: 'MMK 1,300,000 – 2,000,000', benefits: 'Technical certification support, overtime pay', currency: 'MMK' },
-    { sector: 'Technology & IT Solutions', role: 'Channel Sales Officer', experience: 'Entry-Mid Level', salary: 'MMK 800,000 – 1,300,000', benefits: 'Commission incentives, mobile stipend', currency: 'MMK' },
-    { sector: 'Engineering Services', role: 'Sales & Marketing Executive', experience: 'Mid-Level (3+ years)', salary: 'MMK 700,000 – 1,000,000', benefits: 'Project bonuses, gasoline allowance', currency: 'MMK' },
-    { sector: 'Corporate Human Resources', role: 'Chief Human Resources Officer (CHRO)', experience: 'C-Suite / Executive', salary: 'MMK 5,000,000 – 8,000,000+', benefits: 'Executive housing, stock options, international insurance', currency: 'MMK' },
-    { sector: 'Corporate Human Resources', role: 'Corporate HR & Admin Manager', experience: 'Senior Management', salary: 'MMK 1,800,000 – 2,800,000', benefits: 'Semi-annual KPI bonus, staff ferry service', currency: 'MMK' },
-    { sector: 'Corporate Human Resources', role: 'HR Executive / C&B Specialist', experience: 'Junior-Mid Level', salary: 'MMK 600,000 – 1,000,000', benefits: 'Attendance bonus, overtime pay', currency: 'MMK' },
-    { sector: 'International Agencies', role: 'Remote US Market Recruiter', experience: 'Professional / Mid', salary: 'USD 500 – 800', benefits: 'Foreign currency settlement, internet stipend', currency: 'USD' },
-];
-
-const benchmarkSectors = [...new Set(salaryBenchmarks.map((item) => item.sector))];
-const benchmarkExperienceTiers = [...new Set(salaryBenchmarks.map((item) => item.experience))];
-const filteredSalaryBenchmarks = computed(() => salaryBenchmarks.filter((item) => {
-    const query = benchmarkSearch.value.trim().toLowerCase();
-    const matchesSearch = !query || `${item.role} ${item.sector} ${item.benefits}`.toLowerCase().includes(query);
-    const location = item.currency === 'USD' ? 'Remote · US market' : 'Myanmar · city not specified';
-    return matchesSearch
-        && (!benchmarkSector.value || item.sector === benchmarkSector.value)
-        && (!benchmarkExperience.value || item.experience === benchmarkExperience.value)
-        && (!benchmarkLocation.value || location === benchmarkLocation.value)
-        && (!benchmarkCategory.value || benchmarkCategoryFor(item.role) === benchmarkCategory.value)
-        && (!benchmarkRole.value || item.role === benchmarkRole.value);
-}));
-const selectedBenchmark = computed(() => salaryBenchmarks.find((item) => item.role === benchmarkRole.value) || salaryBenchmarks[0]);
-const benchmarkRange = computed(() => {
-    const values = selectedBenchmark.value.salary.match(/[\d,]+/g)?.map((value) => Number(value.replaceAll(',', ''))) || [0, 0];
-    const low = values[0] || 0;
-    const high = values[1] || low;
-    const format = (amount) => `${selectedBenchmark.value.currency} ${Math.round(amount).toLocaleString('en-US')}`;
-    return [
-        { label: '25th · lower range marker', amount: format(low) },
-        { label: '50th · range midpoint', amount: format((low + high) / 2) },
-        { label: '75th · upper range marker', amount: format(high) },
-    ];
-});
-
-const insightModules = [
-    { title: 'Compensation filters and percentile view', audience: 'Candidates and recruiters', feature: 'Filter by role, experience, industry, and location; compare fixed pay separately from allowances.', output: 'Percentiles should be shown only after enough dated, comparable salary observations are collected.' },
-    { title: 'Gross-to-net calculator', audience: 'Job seekers', feature: 'Estimate take-home pay from gross compensation and eligible personal reliefs.', output: 'Apply progressive PIT and the employee SSB contribution capped at MMK 6,000, using the relevant tax year.' },
-    { title: 'Employer total-cost model', audience: 'Hiring managers and finance teams', feature: 'Model employer cost beyond gross salary, with transparent assumptions.', output: 'Include employer SSB up to MMK 9,000; assess injury contributions and leave/severance reserves separately.' },
-    { title: 'Compliance alerts', audience: 'HR operations and legal teams', feature: 'Track applicable minimum-wage, overtime, and statutory changes.', output: 'Flag the covered minimum daily wage and retain the MMK 4,800 base as the supplied OT example basis.' },
-    { title: 'Talent and market trends', audience: 'Executives and agency recruiters', feature: 'Compare internal pay with external benchmark observations and hiring outcomes.', output: 'Trend analysis requires dated source data and enough comparable roles to avoid misleading conclusions.' },
-];
 const allowanceHistory = [
     { date: '1 October 2023', amount: 'MMK 1,000', detail: 'First additional daily allowance' },
     { date: '1 August 2024', amount: 'MMK 1,000', detail: 'Second additional daily allowance' },
@@ -469,103 +504,71 @@ const severanceBands = [
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="salary-benchmarks-title">
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="salary-explorer-title">
                 <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
                     <div class="max-w-3xl">
-                        <p class="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)]">Part 7 · Sector benchmarks</p>
-                        <h2 id="salary-benchmarks-title" class="mt-2 text-2xl font-bold text-[var(--brand-ink)]">Indicative monthly salary ranges by role</h2>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">The ranges and benefits below are the figures supplied for this page. They are not independently verified salary survey results: no source links, observation dates, sample sizes, or locations were provided. Treat them as directional examples until each listing is sourced and dated.</p>
+                        <p class="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)]">Live platform data</p>
+                        <h2 id="salary-explorer-title" class="mt-2 text-2xl font-bold text-[var(--brand-ink)]">Salary Explorer</h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">Explore published job listings that disclose a valid monthly salary. Figures update from matching records and are separated by currency; they are advertised ranges, not independently verified compensation outcomes.</p>
                     </div>
-                    <span class="inline-flex w-fit items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900">User-supplied · validation needed</span>
+                    <button type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500" @click="resetSalaryFilters">Reset filters</button>
                 </div>
 
-                <div class="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <label class="text-sm font-medium text-slate-700">Search role or benefit
-                        <input v-model="benchmarkSearch" type="search" placeholder="e.g. Sales Manager" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-                    </label>
-                    <label class="text-sm font-medium text-slate-700">Job category
-                        <select v-model="benchmarkCategory" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option value="">All categories</option>
-                            <option v-for="category in benchmarkCategories" :key="category" :value="category">{{ category }}</option>
-                        </select>
+                <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <label class="text-sm font-medium text-slate-700">Job title or keyword
+                        <input v-model="explorerFilters.keyword" type="search" maxlength="120" placeholder="Search advertised job titles" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
                     </label>
                     <label class="text-sm font-medium text-slate-700">Specific job title
-                        <select v-model="benchmarkRole" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option value="">All job titles</option>
-                            <option v-for="item in salaryBenchmarks" :key="item.role" :value="item.role">{{ item.role }}</option>
-                        </select>
+                        <select v-model="explorerFilters.title" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All titles</option><option v-for="title in salaryExplorer?.options.titles ?? []" :key="title" :value="title">{{ title }}</option></select>
                     </label>
-                    <label class="text-sm font-medium text-slate-700">Industry
-                        <select v-model="benchmarkSector" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option value="">All industries</option>
-                            <option v-for="sector in benchmarkSectors" :key="sector" :value="sector">{{ sector }}</option>
-                        </select>
-                    </label>
-                    <label class="text-sm font-medium text-slate-700">Experience tier
-                        <select v-model="benchmarkExperience" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option value="">All experience tiers</option>
-                            <option v-for="tier in benchmarkExperienceTiers" :key="tier" :value="tier">{{ tier }}</option>
-                        </select>
+                    <label class="text-sm font-medium text-slate-700">Experience level
+                        <select v-model="explorerFilters.experience_level" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All experience levels</option><option value="entry">Entry</option><option value="junior">Junior</option><option value="mid">Mid</option><option value="senior">Senior</option><option value="lead">Lead</option><option value="executive">Executive</option></select>
                     </label>
                     <label class="text-sm font-medium text-slate-700">Location
-                        <select v-model="benchmarkLocation" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option value="">All locations</option>
-                            <option value="Myanmar · city not specified">Myanmar · city not specified</option>
-                            <option value="Remote · US market">Remote · US market</option>
-                        </select>
+                        <input v-model="explorerFilters.location" type="search" maxlength="120" placeholder="Township, region, or location" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                    </label>
+                    <label class="text-sm font-medium text-slate-700">Job category
+                        <select v-model="explorerFilters.category_id" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All categories</option><option v-for="category in salaryExplorer?.options.categories ?? []" :key="category.id" :value="String(category.id)">{{ category.name }}</option></select>
+                    </label>
+                    <label class="text-sm font-medium text-slate-700">Salary currency
+                        <select v-model="explorerFilters.currency" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option v-for="currency in salaryExplorer?.options.currencies ?? []" :key="currency" :value="currency">{{ currency }}</option></select>
                     </label>
                 </div>
 
-                <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200">
-                    <table class="min-w-[850px] w-full text-left text-sm">
-                        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th scope="col" class="px-4 py-3 font-semibold">Industry</th><th scope="col" class="px-4 py-3 font-semibold">Role</th><th scope="col" class="px-4 py-3 font-semibold">Experience</th><th scope="col" class="px-4 py-3 font-semibold">Location</th><th scope="col" class="px-4 py-3 font-semibold">Monthly range</th><th scope="col" class="px-4 py-3 font-semibold">Common benefits</th></tr></thead>
-                        <tbody>
-                            <tr v-for="item in filteredSalaryBenchmarks" :key="item.role" class="border-t border-slate-100 align-top">
-                                <td class="px-4 py-3 text-slate-600">{{ item.sector }}</td><th scope="row" class="px-4 py-3 font-semibold text-slate-900">{{ item.role }}</th><td class="px-4 py-3 text-slate-600">{{ item.experience }}</td><td class="px-4 py-3 text-slate-600">{{ item.currency === 'USD' ? 'Remote · US market' : 'Myanmar · city not specified' }}</td><td class="whitespace-nowrap px-4 py-3 font-semibold text-[var(--brand-ink)]">{{ item.salary }}</td><td class="px-4 py-3 text-slate-600">{{ item.benefits }}</td>
-                            </tr>
-                            <tr v-if="filteredSalaryBenchmarks.length === 0"><td colspan="6" class="px-4 py-8 text-center text-slate-500">No matching roles. Try another search or filter.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p class="mt-4 text-xs leading-5 text-slate-500">The remote recruiter range is denominated in USD; it is shown separately from MMK roles. Salary ranges alone do not provide enough observations to calculate reliable 25th, 50th, or 75th percentiles.</p>
-
-                <div class="mt-6 grid gap-6 lg:grid-cols-2">
-                    <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-5">
-                        <div class="flex flex-wrap items-start justify-between gap-2">
-                            <div><h3 class="font-semibold text-blue-950">Range markers for {{ selectedBenchmark.role }}</h3><p class="mt-1 text-xs text-blue-900/70">These are positions within the supplied range, not observed market percentiles.</p></div>
-                            <select v-model="benchmarkRole" aria-label="Choose role for range markers" class="max-w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700"><option v-for="item in salaryBenchmarks" :key="item.role" :value="item.role">{{ item.role }}</option></select>
-                        </div>
-                        <div class="mt-4 grid grid-cols-3 gap-2">
-                            <div v-for="marker in benchmarkRange" :key="marker.label" class="rounded-lg bg-white p-3 text-center"><p class="text-xs leading-4 text-slate-500">{{ marker.label }}</p><p class="mt-2 text-sm font-bold text-[var(--brand-ink)]">{{ marker.amount }}</p></div>
-                        </div>
+                <div v-if="salaryExplorerLoading" class="mt-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-5 text-sm text-blue-900" role="status">Loading salary data…</div>
+                <div v-else-if="salaryExplorerError" class="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800" role="alert">{{ salaryExplorerError }} <button type="button" class="ml-2 font-semibold underline" @click="loadSalaryExplorer">Try again</button></div>
+                <template v-else-if="salaryExplorer">
+                    <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Listings used</p><p class="mt-2 text-2xl font-bold text-[var(--brand-ink)]">{{ salaryExplorer.summary.sample_size }}</p><p class="mt-1 text-xs text-slate-500">Published listings with valid salary values</p></article>
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estimated minimum</p><p class="mt-2 text-xl font-bold text-[var(--brand-ink)]">{{ salaryAmount(salaryExplorer.summary.minimum_salary) }}</p><p class="mt-1 text-xs text-slate-500">Lowest advertised range floor</p></article>
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estimated maximum</p><p class="mt-2 text-xl font-bold text-[var(--brand-ink)]">{{ salaryAmount(salaryExplorer.summary.maximum_salary) }}</p><p class="mt-1 text-xs text-slate-500">Highest advertised range ceiling</p></article>
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Median advertised salary</p><p class="mt-2 text-xl font-bold text-[var(--brand-ink)]">{{ salaryExplorer.summary.median_available ? salaryAmount(salaryExplorer.summary.median_salary) : 'Insufficient data' }}</p><p class="mt-1 text-xs text-slate-500">Requires at least {{ salaryExplorer.summary.minimum_median_sample }} matching listings</p></article>
                     </div>
-                    <div class="rounded-xl border border-slate-200 p-5">
-                        <h3 class="font-semibold text-slate-900">Illustrative package split</h3>
-                        <p class="mt-1 text-xs leading-5 text-slate-600">The proposed 60–70% base / 30–40% allowance structure is an example for negotiation, not a statutory or survey result.</p>
-                        <div class="mt-4">
-                            <div class="flex justify-between text-xs font-medium text-slate-600"><span>Fixed base pay</span><span>60–70%</span></div><div class="mt-1 h-3 overflow-hidden rounded-full bg-slate-200"><div class="h-full w-[65%] rounded-full bg-blue-700" /></div>
-                            <div class="mt-3 flex justify-between text-xs font-medium text-slate-600"><span>Variable allowances</span><span>30–40%</span></div><div class="mt-1 h-3 overflow-hidden rounded-full bg-slate-200"><div class="ml-auto h-full w-[35%] rounded-full bg-sky-500" /></div>
-                        </div>
+
+                    <div v-if="salaryExplorer.summary.sample_size" class="mt-6 grid gap-5 lg:grid-cols-2">
+                        <section class="rounded-xl border border-slate-200 p-5" aria-labelledby="salary-distribution-title">
+                            <div class="flex items-start justify-between gap-3"><div><h3 id="salary-distribution-title" class="font-semibold text-slate-900">Advertised salary distribution</h3><p class="mt-1 text-xs text-slate-500">Buckets use each listing’s range midpoint, or its single disclosed bound.</p></div><span class="text-xs font-medium text-slate-500">{{ salaryExplorer.filters.currency }} / month</span></div>
+                            <div class="mt-5 space-y-3"><div v-for="(bucket, index) in salaryExplorer.distribution" :key="index" class="grid grid-cols-[112px_minmax(0,1fr)_32px] items-center gap-3 text-xs"><span class="truncate text-slate-600">{{ salaryAmount(bucket.minimum) }}{{ bucket.minimum !== bucket.maximum ? `–${Number(bucket.maximum).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '' }}</span><div class="h-2.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-700 transition-[width] duration-200" :style="{ width: `${salaryExplorer.summary.sample_size ? bucket.count / salaryExplorer.summary.sample_size * 100 : 0}%` }" /></div><span class="text-right font-semibold text-slate-700">{{ bucket.count }}</span></div></div>
+                        </section>
+
+                        <section class="rounded-xl border border-slate-200 p-5" aria-labelledby="salary-comparison-title">
+                            <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 id="salary-comparison-title" class="font-semibold text-slate-900">Compare two roles or categories</h3><p class="mt-1 text-xs text-slate-500">Both comparisons use the selected currency and filters.</p></div><select v-model="comparisonType" aria-label="Compare by title or category" class="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="title">Job title</option><option value="category">Category</option></select></div>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2"><label class="text-xs font-medium text-slate-600">First selection<select v-model="comparisonFirst" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800"><option value="">Choose one</option><option v-for="option in comparisonOptions" :key="`a-${option.value}`" :value="option.value">{{ option.label }}</option></select></label><label class="text-xs font-medium text-slate-600">Second selection<select v-model="comparisonSecond" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800"><option value="">Choose one</option><option v-for="option in comparisonOptions" :key="`b-${option.value}`" :value="option.value">{{ option.label }}</option></select></label></div>
+                            <div v-if="salaryExplorer.comparison.length === 2" class="mt-4 space-y-4"><div v-for="item in salaryExplorer.comparison" :key="item.value"><div class="flex justify-between gap-3 text-xs"><span class="truncate font-semibold text-slate-700">{{ comparisonOptions.find((option) => option.value === item.value)?.label ?? item.value }}</span><span class="shrink-0 text-slate-500">{{ item.summary.sample_size }} listings</span></div><div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-sky-600" :style="{ width: `${comparisonMaximum && item.summary.median_salary ? item.summary.median_salary / comparisonMaximum * 100 : 0}%` }" /></div><p v-if="item.summary.sample_size" class="mt-1 text-xs text-slate-600">Median: {{ item.summary.median_available ? salaryAmount(item.summary.median_salary) : 'Insufficient data' }} · Range: {{ salaryAmount(item.summary.minimum_salary) }} – {{ salaryAmount(item.summary.maximum_salary) }}</p><p v-else class="mt-1 text-xs text-slate-500">No matching listings for this selection.</p></div></div>
+                            <p v-else class="mt-4 text-sm text-slate-500">Choose two different values to compare records.</p>
+                        </section>
                     </div>
-                </div>
-            </section>
+                    <div v-else class="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center"><h3 class="font-semibold text-slate-800">No matching salary listings</h3><p class="mt-2 text-sm text-slate-600">Try another filter. Statistics appear only when published listings contain a positive salary amount.</p></div>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="salary-platform-modules-title">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)]">Part 8 · Platform experience</p>
-                    <h2 id="salary-platform-modules-title" class="mt-2 text-2xl font-bold text-[var(--brand-ink)]">Salary intelligence modules</h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">The benchmark table has working role, category, industry, experience-tier, and location filters. The gross-to-net and employer-cost panels below calculate simplified estimates from the assumptions you enter. Live percentiles and talent trend reporting still need dated, comparable market observations and connected placement data.</p>
-                </div>
+                    <section v-if="salaryExplorer.summary.sample_size" class="mt-5 rounded-xl border border-blue-100 bg-blue-50/70 p-5" aria-labelledby="personal-salary-title">
+                        <h3 id="personal-salary-title" class="font-semibold text-blue-950">Compare an expected salary</h3>
+                        <p class="mt-1 text-sm leading-5 text-blue-900/80">Enter a monthly amount to see where it falls against the current explorer filters. This describes advertised data and does not judge whether an offer is fair.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,280px)_1fr] sm:items-end"><label class="text-sm font-medium text-slate-700">Your expected monthly salary ({{ salaryExplorer.filters.currency }})<input v-model.number="personalSalary" type="number" min="1" step="1000" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label><p v-if="personalSalaryResult" class="rounded-lg bg-white px-4 py-3 text-sm text-slate-700">This amount is <strong>{{ personalSalaryResult.position }}</strong> the observed advertised range, based on {{ personalSalaryResult.sampleSize }} matching listings.</p><p v-else class="text-sm text-slate-500">Enter a positive amount to compare it with the available range.</p></div>
+                    </section>
 
-                <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <article v-for="module in insightModules" :key="module.title" class="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)]">{{ module.audience }}</p>
-                        <h3 class="mt-2 font-semibold text-slate-900">{{ module.title }}</h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">{{ module.feature }}</p>
-                        <p class="mt-3 border-t border-slate-200 pt-3 text-xs leading-5 text-slate-500">{{ module.output }}</p>
-                    </article>
-                </div>
-                <p class="mt-5 rounded-lg border-l-4 border-blue-500 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">The Social Security Rules set 1% as the basic Employment Injury Fund contribution, with possible adjustment under the rules. The TCOE estimate below exposes this as an editable assumption; confirm the employer’s current SSB rate. Leave and severance values are planning estimates, distinct from statutory deductions.</p>
+                    <section class="mt-6" aria-labelledby="salary-related-jobs-title"><div class="flex items-center justify-between gap-3"><h3 id="salary-related-jobs-title" class="font-semibold text-slate-900">Related job listings</h3><span class="text-xs text-slate-500">{{ salaryExplorer.jobs.length }} shown</span></div><div v-if="salaryExplorer.jobs.length" class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3"><article v-for="job in salaryExplorer.jobs" :key="job.id" class="rounded-xl border border-slate-200 p-4"><h4 class="font-semibold text-slate-900">{{ job.title }}</h4><p class="mt-1 text-xs text-slate-500">{{ job.category || 'Category not specified' }} · {{ job.location }}</p><p class="mt-3 text-sm font-semibold text-[var(--brand-ink)]">{{ salaryRange(job) }}</p><a :href="`/#details?job=${job.id}`" class="mt-3 inline-flex text-sm font-semibold text-blue-800 hover:underline">View job</a></article></div><p v-else class="mt-3 text-sm text-slate-500">No matching listings are available.</p></section>
+                    <p class="mt-5 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">Method: only published, unexpired listings with positive, internally consistent salary bounds are included. A range’s midpoint represents that listing for the median and distribution; a single bound represents itself. Minimum and maximum cards use the disclosed range floor and ceiling. Median is shown only for {{ salaryExplorer.summary.minimum_median_sample }} or more records. Monthly units follow the platform’s job-posting form. Currency conversion is not performed.</p>
+                </template>
             </section>
 
             <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="gross-net-calculator-title">
@@ -647,25 +650,6 @@ const severanceBands = [
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="salary-data-sources-title">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div class="max-w-3xl">
-                    <p class="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)]">Sources and methodology</p>
-                    <h2 id="salary-data-sources-title" class="mt-2 text-xl font-bold text-[var(--brand-ink)]">Data sources</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Salary ranges remain indicative until verified against a dated source.</p>
-                    </div>
-                    <label class="w-full text-sm font-medium text-slate-700 sm:max-w-sm">Choose a source
-                        <select v-model="selectedDataSource" class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <option v-for="source in dataSources" :key="source.id" :value="source.id">{{ source.name }}</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
-                    <p class="text-sm leading-5 text-slate-600">{{ activeDataSource.detail }}</p>
-                    <a class="mt-2 inline-block shrink-0 text-sm font-semibold text-[var(--brand-primary)] underline underline-offset-2 sm:mt-0" :href="activeDataSource.url" target="_blank" rel="noopener noreferrer">{{ activeDataSource.link }}</a>
-                </div>
-                <p class="mt-3 text-xs leading-5 text-slate-500">Record the date, sample, location, currency, and pay type for each benchmark. Don’t show percentiles for small or incomparable samples.</p>
-            </section>
         </div>
     </section>
 </template>
