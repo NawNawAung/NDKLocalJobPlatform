@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import InterviewSchedulerModal from '../components/modal.vue';
 
 const loading = ref(true);
@@ -104,6 +104,7 @@ async function downloadCandidateCv(application) {
 watch([jobFilter, statusFilter], loadCandidates);
 watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadCandidates, 250); });
 onMounted(loadCandidates);
+onUnmounted(() => clearTimeout(searchTimer));
 </script>
 
 <template>

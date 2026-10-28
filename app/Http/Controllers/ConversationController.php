@@ -68,6 +68,7 @@ class ConversationController extends Controller
                 ['created_by' => $request->user()->id],
             );
             $conversation->participants()->syncWithoutDetaching([$candidate->id, $employer->id]);
+
             return $conversation;
         });
 
@@ -149,7 +150,9 @@ class ConversationController extends Controller
                 return $message->load(['sender:id,name', 'attachments', 'reads']);
             });
         } catch (\Throwable $exception) {
-            if ($storedPaths !== []) Storage::disk('local')->delete($storedPaths);
+            if ($storedPaths !== []) {
+                Storage::disk('local')->delete($storedPaths);
+            }
             throw $exception;
         }
 

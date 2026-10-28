@@ -11,6 +11,7 @@ class EnsureAccountIsActive
     public function handle(Request $request, Closure $next): Response
     {
         abort_unless($request->user()?->status, 403, 'This account is inactive.');
+
         return $next($request);
     }
 }

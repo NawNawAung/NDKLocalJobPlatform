@@ -31,6 +31,7 @@ class EmployerReviewsAndCategoriesTest extends TestCase
         $category = JobCategory::create(['name' => 'Technology', 'slug' => 'technology', 'is_active' => true]);
         $job = Job::create(['employer_id' => $employer->id, 'category_id' => $category->id, 'category' => $category->name, 'title' => 'Developer', 'description' => 'Build services.', 'location' => 'Yangon', 'employment_type' => 'full_time', 'status' => 'published']);
         $application = Application::create(['job_id' => $job->id, 'job_seeker_id' => $seeker->id, 'status' => 'shortlisted', 'submitted_at' => now()]);
+
         return compact('employerUser', 'employer', 'seekerUser', 'seeker', 'category', 'job', 'application');
     }
 

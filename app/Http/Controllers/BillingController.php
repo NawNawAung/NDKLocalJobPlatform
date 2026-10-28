@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\BillingProduct;
 use App\Models\Employer;
-use App\Models\FeatureUsage;
 use App\Models\Invoice;
 use App\Models\Job;
 use App\Models\JobPromotion;
@@ -20,11 +19,10 @@ use App\Models\Refund;
 use App\Models\Subscription;
 use App\Models\SubscriptionItem;
 use App\Models\User;
-use App\Services\EmployerEntitlementService;
 use App\Services\AdminAuditLogger;
+use App\Services\EmployerEntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -38,12 +36,14 @@ class BillingController extends Controller
     private function employer(Request $request): Employer
     {
         abort_unless($request->user()->status && $request->user()->role === 'employer' && $request->user()->employer, 403);
+
         return $request->user()->employer;
     }
 
     private function admin(Request $request): User
     {
         abort_unless($request->user()->status && $request->user()->role === 'admin', 403);
+
         return $request->user();
     }
 
@@ -188,6 +188,7 @@ class BillingController extends Controller
             if ($promotion) {
                 $order->update(['billing_snapshot' => [...$order->billing_snapshot, 'promotion_code' => $promotion->code]]);
             }
+
             return $order;
         });
 
@@ -222,12 +223,14 @@ class BillingController extends Controller
                     'submitted_at' => now(),
                 ]);
                 $lockedOrder->update(['status' => 'awaiting_review']);
+
                 return $payment;
             });
         } catch (\Throwable $exception) {
             Storage::disk('local')->delete($path);
             throw $exception;
         }
+
         return response()->json(['message' => 'Payment receipt submitted. The platform team will review it.', 'payment_status' => $payment->status], 201);
     }
 
@@ -250,6 +253,7 @@ class BillingController extends Controller
     {
         abort_unless($request->user()->role === 'admin' || $invoice->user_id === $request->user()->id, 404);
         $invoice->load(['order.items', 'user']);
+
         return view('billing.invoice', compact('invoice'));
     }
 
@@ -271,6 +275,7 @@ class BillingController extends Controller
                 });
             })
             ->latest()->paginate(40)->withQueryString();
+
         return response()->json([
             'payments' => $payments->through(fn (Payment $payment) => [
                 'id' => $payment->id, 'status' => $payment->status, 'method' => $payment->payment_method,
@@ -293,6 +298,7 @@ class BillingController extends Controller
     {
         $this->admin($request);
         abort_unless($payment->proof_path && Storage::disk('local')->exists($payment->proof_path), 404);
+
         return Storage::disk('local')->response($payment->proof_path);
     }
 
@@ -314,6 +320,7 @@ class BillingController extends Controller
                     Notification::sendNotification($payment->order->employer->user, 'Payment receipt needs attention', $data['notes'] ?: 'Your transfer receipt could not be verified. Submit a new receipt from billing.', null, 'billing', '/#billing');
                 }
                 $this->audit->record($request, $admin, 'payment.reviewed.reject', $payment, $before, ['payment_status' => $payment->status, 'order_status' => $payment->order->status, 'notes' => $payment->failure_reason]);
+
                 return;
             }
 
@@ -373,6 +380,7 @@ class BillingController extends Controller
             }
             $this->audit->record($request, $admin, 'payment.reviewed.approve', $payment, $before, ['payment_status' => $payment->status, 'order_status' => $order->status, 'invoice_id' => $invoice->id]);
         });
+
         return response()->json(['message' => $data['decision'] === 'approve' ? 'Payment approved and order fulfilled.' : 'Payment rejected; the employer can submit a new receipt.']);
     }
 
@@ -429,9 +437,11 @@ class BillingController extends Controller
                 }
             }
             $this->audit->record($request, $admin, 'payment.refund_recorded', $payment, $before, ['status' => $payment->status, 'refund_id' => $refund->id, 'refund_amount' => $refund->amount, 'reason' => $refund->reason]);
+
             return $refund;
         });
         $payment->refresh();
+
         return response()->json(['message' => 'Manual refund recorded. Ensure the funds were returned outside the platform before recording it.', 'refund_id' => $refund->id]);
     }
 
@@ -474,6 +484,7 @@ class BillingController extends Controller
         foreach ($candidates as $candidate) {
             $this->entitlements->record($employer, 'candidate_profile_preview', 1, 'job_seeker', $candidate->id);
         }
+
         return response()->json([
             'candidates' => $candidates->map(fn ($candidate) => [
                 'id' => $candidate->id,
@@ -507,6 +518,7 @@ class BillingController extends Controller
         $candidate = \App\Models\JobSeeker::query()->whereKey($jobSeekerId)->where('status', true)->where('profile_searchable', true)->firstOrFail();
         abort_unless($candidate->cv_path && Storage::disk('local')->exists($candidate->cv_path), 404);
         $this->entitlements->record($employer, 'candidate_cv_downloads', 1, 'job_seeker', $candidate->id);
+
         return Storage::disk('local')->download($candidate->cv_path, basename($candidate->cv_original_name ?: $candidate->cv_path));
     }
 }

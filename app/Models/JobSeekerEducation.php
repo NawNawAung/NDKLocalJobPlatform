@@ -14,5 +14,8 @@ class JobSeekerEducation extends Model
         'started_year', 'graduated_year', 'description', 'sort_order',
     ];
 
-    public function jobSeeker(): BelongsTo { return $this->belongsTo(JobSeeker::class); }
+    public function jobSeeker(): BelongsTo
+    {
+        return $this->belongsTo(JobSeeker::class);
+    }
 }

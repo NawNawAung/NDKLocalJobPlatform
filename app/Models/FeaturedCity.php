@@ -9,5 +9,8 @@ class FeaturedCity extends Model
 {
     protected $fillable = ['region_id', 'name', 'highlight', 'sort_order'];
 
-    public function region(): BelongsTo { return $this->belongsTo(Region::class); }
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
+    }
 }

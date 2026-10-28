@@ -9,7 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Employer extends Model
 {
     protected $fillable = ['user_id', 'region_id', 'township_id', 'company_name', 'company_description', 'location', 'website_url', 'social_links', 'is_verified', 'verification_status', 'verification_notes', 'verification_requested_at', 'verification_reviewed_at', 'verification_reviewed_by'];
-    protected function casts(): array { return ['is_verified' => 'boolean', 'social_links' => 'array', 'verification_requested_at' => 'datetime', 'verification_reviewed_at' => 'datetime']; }
+
+    protected function casts(): array
+    {
+        return ['is_verified' => 'boolean', 'social_links' => 'array', 'verification_requested_at' => 'datetime', 'verification_reviewed_at' => 'datetime'];
+    }
 
     /**
      * Keep the legacy boolean readable while making the richer status column
@@ -19,26 +23,70 @@ class Employer extends Model
     public function getIsVerifiedAttribute(mixed $value): bool
     {
         $status = $this->attributes['verification_status'] ?? null;
+
         return $status !== null ? $status === 'verified' : (bool) $value;
     }
 
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function region(): BelongsTo { return $this->belongsTo(Region::class); }
-    public function township(): BelongsTo { return $this->belongsTo(Township::class); }
-    public function jobs(): HasMany { return $this->hasMany(Job::class); }
-    public function reviews(): HasMany { return $this->hasMany(EmployerReview::class); }
-    public function interviews(): HasMany { return $this->hasMany(Interview::class); }
-    public function subscriptions(): HasMany { return $this->hasMany(Subscription::class); }
-    public function orders(): HasMany { return $this->hasMany(Order::class); }
-    public function featureUsages(): HasMany { return $this->hasMany(FeatureUsage::class); }
-    public function jobPromotions(): HasMany { return $this->hasMany(JobPromotion::class); }
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
-    public function postJob(array $attributes): Job { return $this->jobs()->create($attributes); }
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
+    }
+
+    public function township(): BelongsTo
+    {
+        return $this->belongsTo(Township::class);
+    }
+
+    public function jobs(): HasMany
+    {
+        return $this->hasMany(Job::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(EmployerReview::class);
+    }
+
+    public function interviews(): HasMany
+    {
+        return $this->hasMany(Interview::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function featureUsages(): HasMany
+    {
+        return $this->hasMany(FeatureUsage::class);
+    }
+
+    public function jobPromotions(): HasMany
+    {
+        return $this->hasMany(JobPromotion::class);
+    }
+
+    public function postJob(array $attributes): Job
+    {
+        return $this->jobs()->create($attributes);
+    }
 
     public function editJob(Job $job, array $attributes): Job
     {
         abort_unless($job->employer_id === $this->id, 403);
         $job->update($attributes);
+
         return $job->refresh();
     }
 
@@ -46,12 +94,14 @@ class Employer extends Model
     {
         abort_unless($application->job?->employer_id === $this->id, 403);
         $application->updateStatus($status);
+
         return $application->refresh();
     }
 
     public function scheduleInterview(Application $application, array $attributes): Interview
     {
         abort_unless($application->job?->employer_id === $this->id, 403);
+
         return $this->interviews()->create([...$attributes, 'application_id' => $application->id, 'status' => 'scheduled']);
     }
 }

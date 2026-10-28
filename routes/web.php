@@ -1,16 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\JobSearchController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\EmployerReviewController;
 use App\Http\Controllers\EmployerWorkspaceController;
 use App\Http\Controllers\JobApplicationController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\BillingController;
-use App\Http\Controllers\AdminController;
 use App\Http\Controllers\JobCategoryController;
-use App\Http\Controllers\EmployerReviewController;
+use App\Http\Controllers\JobSearchController;
+use App\Http\Controllers\NotificationController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');

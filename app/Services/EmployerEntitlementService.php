@@ -47,7 +47,10 @@ class EmployerEntitlementService
 
     public function remaining(Employer $employer, string $feature, int $limit): ?int
     {
-        if ($limit < 0) return null;
+        if ($limit < 0) {
+            return null;
+        }
+
         return max(0, $limit - $this->usage($employer, $feature));
     }
 

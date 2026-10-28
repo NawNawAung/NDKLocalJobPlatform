@@ -8,8 +8,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ConversationParticipant extends Model
 {
     protected $fillable = ['conversation_id', 'user_id', 'joined_at'];
-    protected function casts(): array { return ['joined_at' => 'datetime']; }
 
-    public function conversation(): BelongsTo { return $this->belongsTo(Conversation::class); }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    protected function casts(): array
+    {
+        return ['joined_at' => 'datetime'];
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

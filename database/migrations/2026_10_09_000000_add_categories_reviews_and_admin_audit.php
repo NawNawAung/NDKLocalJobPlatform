@@ -29,13 +29,17 @@ return new class extends Migration
 
         foreach (DB::table('job_listings')->whereNotNull('category')->distinct()->pluck('category') as $legacyName) {
             $name = trim((string) $legacyName);
-            if ($name === '') continue;
+            if ($name === '') {
+                continue;
+            }
             $category = DB::table('job_categories')->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
             if (! $category) {
                 $baseSlug = Str::slug($name) ?: 'category';
                 $slug = $baseSlug;
                 $suffix = 2;
-                while (DB::table('job_categories')->where('slug', $slug)->exists()) $slug = $baseSlug.'-'.$suffix++;
+                while (DB::table('job_categories')->where('slug', $slug)->exists()) {
+                    $slug = $baseSlug.'-'.$suffix++;
+                }
                 $id = DB::table('job_categories')->insertGetId(['name' => $name, 'slug' => $slug, 'is_active' => true, 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now()]);
                 $category = (object) ['id' => $id];
             }
@@ -49,7 +53,9 @@ return new class extends Migration
             if (! $category) {
                 $slug = 'uncategorized-legacy';
                 $suffix = 2;
-                while (DB::table('job_categories')->where('slug', $slug)->exists()) $slug = 'uncategorized-legacy-'.$suffix++;
+                while (DB::table('job_categories')->where('slug', $slug)->exists()) {
+                    $slug = 'uncategorized-legacy-'.$suffix++;
+                }
                 $id = DB::table('job_categories')->insertGetId(['name' => $name, 'slug' => $slug, 'is_active' => true, 'sort_order' => 65535, 'created_at' => now(), 'updated_at' => now()]);
                 $category = (object) ['id' => $id];
             }

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     private const UNIQUE_INDEX = 'applications_job_job_seeker_unique';
+
     private const LEGACY_INDEX = 'applications_job_id_job_seeker_id_index';
 
     public function up(): void
@@ -17,8 +18,7 @@ return new class extends Migration
         }
 
         $indexes = Schema::getIndexes('applications');
-        $hasUniquePair = collect($indexes)->contains(fn (array $index) =>
-            ($index['unique'] ?? false)
+        $hasUniquePair = collect($indexes)->contains(fn (array $index) => ($index['unique'] ?? false)
             && ($index['columns'] ?? []) === ['job_id', 'job_seeker_id']
         );
 
@@ -66,8 +66,7 @@ return new class extends Migration
         }
 
         $indexes = Schema::getIndexes('applications');
-        $legacyExists = collect($indexes)->contains(fn (array $index) =>
-            ($index['name'] ?? null) === self::LEGACY_INDEX
+        $legacyExists = collect($indexes)->contains(fn (array $index) => ($index['name'] ?? null) === self::LEGACY_INDEX
             || (($index['unique'] ?? false) === false && ($index['columns'] ?? []) === ['job_id', 'job_seeker_id'])
         );
         if (! $legacyExists) {

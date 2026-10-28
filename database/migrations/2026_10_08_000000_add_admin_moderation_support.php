@@ -10,11 +10,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('employers', function (Blueprint $table) {
-            if (! Schema::hasColumn('employers', 'verification_status')) $table->string('verification_status', 24)->default('unverified')->index();
-            if (! Schema::hasColumn('employers', 'verification_notes')) $table->text('verification_notes')->nullable();
-            if (! Schema::hasColumn('employers', 'verification_requested_at')) $table->timestamp('verification_requested_at')->nullable();
-            if (! Schema::hasColumn('employers', 'verification_reviewed_at')) $table->timestamp('verification_reviewed_at')->nullable();
-            if (! Schema::hasColumn('employers', 'verification_reviewed_by')) $table->foreignId('verification_reviewed_by')->nullable()->constrained('users')->nullOnDelete();
+            if (! Schema::hasColumn('employers', 'verification_status')) {
+                $table->string('verification_status', 24)->default('unverified')->index();
+            }
+            if (! Schema::hasColumn('employers', 'verification_notes')) {
+                $table->text('verification_notes')->nullable();
+            }
+            if (! Schema::hasColumn('employers', 'verification_requested_at')) {
+                $table->timestamp('verification_requested_at')->nullable();
+            }
+            if (! Schema::hasColumn('employers', 'verification_reviewed_at')) {
+                $table->timestamp('verification_reviewed_at')->nullable();
+            }
+            if (! Schema::hasColumn('employers', 'verification_reviewed_by')) {
+                $table->foreignId('verification_reviewed_by')->nullable()->constrained('users')->nullOnDelete();
+            }
         });
 
         DB::table('employers')->where('is_verified', true)->update(['verification_status' => 'verified']);
@@ -43,8 +53,11 @@ return new class extends Migration
         Schema::table('employers', function (Blueprint $table) {
             foreach (['verification_reviewed_by', 'verification_reviewed_at', 'verification_requested_at', 'verification_notes', 'verification_status'] as $column) {
                 if (Schema::hasColumn('employers', $column)) {
-                    if ($column === 'verification_reviewed_by') $table->dropConstrainedForeignId($column);
-                    else $table->dropColumn($column);
+                    if ($column === 'verification_reviewed_by') {
+                        $table->dropConstrainedForeignId($column);
+                    } else {
+                        $table->dropColumn($column);
+                    }
                 }
             }
         });

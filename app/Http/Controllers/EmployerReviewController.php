@@ -6,9 +6,9 @@ use App\Models\Application;
 use App\Models\Employer;
 use App\Models\EmployerReview;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class EmployerReviewController extends Controller
@@ -36,6 +36,7 @@ class EmployerReviewController extends Controller
                 if (EmployerReview::where('employer_id', $employer->id)->where('job_seeker_id', $user->jobSeeker->id)->exists()) {
                     throw ValidationException::withMessages(['review' => 'A review has already been submitted for this employer.']);
                 }
+
                 return EmployerReview::create([
                     ...$data,
                     'employer_id' => $employer->id,
@@ -57,6 +58,7 @@ class EmployerReviewController extends Controller
     public function publicForEmployer(Employer $employer): JsonResponse
     {
         $reviews = $employer->reviews()->where('status', 'approved')->latest()->limit(10)->get(['id', 'rating', 'title', 'review', 'created_at']);
+
         return response()->json([
             'average_rating' => round((float) $employer->reviews()->where('status', 'approved')->avg('rating'), 1),
             'review_count' => $employer->reviews()->where('status', 'approved')->count(),

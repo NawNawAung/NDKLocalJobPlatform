@@ -6,14 +6,14 @@ use App\Models\Application;
 use App\Models\Interview;
 use App\Models\Job;
 use App\Models\JobCategory;
-use App\Models\Notification;
 use App\Models\JobSeeker;
+use App\Models\Notification;
 use App\Services\EmployerEntitlementService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class EmployerWorkspaceController extends Controller
 {
@@ -22,6 +22,7 @@ class EmployerWorkspaceController extends Controller
     private function employer(Request $request)
     {
         abort_unless($request->user()->status && $request->user()->role === 'employer' && $request->user()->employer, 403);
+
         return $request->user()->employer;
     }
 
@@ -110,14 +111,18 @@ class EmployerWorkspaceController extends Controller
         $request->user()->update(['name' => $data['name'], 'email' => $data['email']]);
         $data['social_links'] = collect($data['social_links'] ?? [])->filter()->all() ?: null;
         $employer->update(collect($data)->only(['company_name', 'company_description', 'location', 'website_url', 'social_links'])->all());
+
         return response()->json(['message' => 'Company profile updated.']);
     }
 
     public function requestVerification(Request $request): JsonResponse
     {
         $employer = $this->employer($request);
-        if ($employer->is_verified) return response()->json(['message' => 'This employer is already verified.']);
+        if ($employer->is_verified) {
+            return response()->json(['message' => 'This employer is already verified.']);
+        }
         $employer->update(['verification_status' => 'pending', 'verification_requested_at' => now(), 'verification_notes' => null]);
+
         return response()->json(['message' => 'Verification request submitted for review.']);
     }
 
@@ -196,6 +201,7 @@ class EmployerWorkspaceController extends Controller
         }
         $job = $employer->postJob([...$data, 'status' => 'published', 'posted_at' => now(), 'salary_currency' => 'MMK']);
         $this->notifyJobAlertSubscribers($job);
+
         return response()->json(['message' => 'Job published.', 'job' => $job], 201);
     }
 
@@ -238,6 +244,7 @@ class EmployerWorkspaceController extends Controller
             return response()->json(['message' => 'Maximum salary must be at least the minimum salary.'], 422);
         }
         $job->update($data);
+
         return response()->json(['message' => 'Job updated.', 'job' => $job->fresh()]);
     }
 
@@ -245,6 +252,7 @@ class EmployerWorkspaceController extends Controller
     {
         abort_unless($job->employer_id === $this->employer($request)->id, 404);
         $job->delete();
+
         return response()->json(['message' => 'Job removed.']);
     }
 
@@ -255,6 +263,7 @@ class EmployerWorkspaceController extends Controller
         $data = $request->validate(['status' => ['required', Rule::in(['reviewing', 'shortlisted', 'interview', 'offered', 'hired', 'rejected'])]]);
         $application->updateStatus($data['status']);
         Notification::sendNotification($application->jobSeeker->user, 'Application update', "Your application for {$application->job->title} is now {$data['status']}.", null, 'application', '/profile');
+
         return response()->json(['message' => 'Application status updated.', 'status' => $application->status]);
     }
 
@@ -267,6 +276,7 @@ class EmployerWorkspaceController extends Controller
         $limit = (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0);
         abort_if($this->entitlements->remaining($employer, 'candidate_cv_downloads', $limit) === 0, 403, 'Your plan has reached its monthly candidate CV download limit. Upgrade your plan to continue.');
         $this->entitlements->record($employer, 'candidate_cv_downloads', 1, 'application', $application->id);
+
         return Storage::disk('local')->download($path, basename($path));
     }
 
@@ -284,6 +294,7 @@ class EmployerWorkspaceController extends Controller
         $interview = $employer->scheduleInterview($application, $data);
         $application->update(['status' => 'interview']);
         Notification::sendNotification($application->jobSeeker->user, 'Interview scheduled', "An interview for {$application->job->title} has been scheduled for {$interview->interview_at->setTimezone('Asia/Yangon')->format('M j, Y g:i A')} Myanmar time.", null, 'interview', '/profile');
+
         return response()->json(['message' => 'Interview scheduled.', 'interview' => $interview], 201);
     }
 
@@ -298,7 +309,9 @@ class EmployerWorkspaceController extends Controller
             ->with('user:id,name')
             ->chunkById(200, function ($jobSeekers) use ($job, $companyName, $actionUrl) {
                 foreach ($jobSeekers as $jobSeeker) {
-                    if (! $jobSeeker->user) continue;
+                    if (! $jobSeeker->user) {
+                        continue;
+                    }
                     Notification::sendNotification(
                         $jobSeeker->user,
                         'New job listing',

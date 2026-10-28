@@ -42,7 +42,7 @@ const closeProfileMenuOnEscape = (event) => {
     if (event.key === 'Escape') profileMenuOpen.value = false;
 };
 const closeProfileMenuOutside = (event) => {
-    if (!event.target.closest('[data-profile-menu]')) profileMenuOpen.value = false;
+    if (!(event.target instanceof Element) || !event.target.closest('[data-profile-menu]')) profileMenuOpen.value = false;
 };
 onMounted(() => {
     window.addEventListener('keydown', closeProfileMenuOnEscape);

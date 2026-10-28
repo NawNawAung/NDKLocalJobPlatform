@@ -18,7 +18,9 @@ class BillingFlowTest extends TestCase
     use RefreshDatabase;
 
     private User $employerUser;
+
     private Employer $employer;
+
     private User $admin;
 
     protected function setUp(): void
@@ -139,6 +141,7 @@ class BillingFlowTest extends TestCase
     private function createOrder(): Order
     {
         $response = $this->actingAs($this->employerUser)->postJson('/api/employer/billing/orders', ['plan_slug' => 'professional'])->assertCreated();
+
         return Order::findOrFail($response->json('order.id'));
     }
 
@@ -149,6 +152,7 @@ class BillingFlowTest extends TestCase
             'reference_number' => $reference,
             'proof' => UploadedFile::fake()->create('receipt.pdf', 20, 'application/pdf'),
         ], ['Accept' => 'application/json'])->assertCreated();
+
         return Payment::query()->where('order_id', $order->id)->latest('id')->firstOrFail();
     }
 }

@@ -19,5 +19,8 @@ class JobSeekerExperience extends Model
         return ['started_on' => 'date', 'ended_on' => 'date', 'is_current' => 'boolean'];
     }
 
-    public function jobSeeker(): BelongsTo { return $this->belongsTo(JobSeeker::class); }
+    public function jobSeeker(): BelongsTo
+    {
+        return $this->belongsTo(JobSeeker::class);
+    }
 }

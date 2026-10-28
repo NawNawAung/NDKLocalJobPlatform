@@ -9,8 +9,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Notification extends Model
 {
     protected $fillable = ['user_id', 'conversation_id', 'title', 'message', 'category', 'action_url', 'is_read'];
-    protected function casts(): array { return ['is_read' => 'boolean']; }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+
+    protected function casts(): array
+    {
+        return ['is_read' => 'boolean'];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public static function sendNotification(
         User $user,
         string $title,
@@ -27,7 +36,19 @@ class Notification extends Model
             'action_url' => $actionUrl,
         ]);
     }
-    public function markAsRead(): bool { return $this->update(['is_read' => true]); }
-    public function deleteNotification(): bool { return (bool) $this->delete(); }
-    public static function viewNotifications(User $user): Collection { return $user->notifications()->latest()->get(); }
+
+    public function markAsRead(): bool
+    {
+        return $this->update(['is_read' => true]);
+    }
+
+    public function deleteNotification(): bool
+    {
+        return (bool) $this->delete();
+    }
+
+    public static function viewNotifications(User $user): Collection
+    {
+        return $user->notifications()->latest()->get();
+    }
 }

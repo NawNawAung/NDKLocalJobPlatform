@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
 use App\Models\AdminAuditLog;
+use App\Models\Application;
 use App\Models\ContentReport;
 use App\Models\Employer;
 use App\Models\EmployerReview;
@@ -25,6 +25,7 @@ class AdminController extends Controller
     private function authorizeAdmin(Request $request): User
     {
         abort_unless($request->user()?->role === 'admin' && $request->user()?->status, 403);
+
         return $request->user();
     }
 
@@ -60,6 +61,7 @@ class AdminController extends Controller
             ->when($filters['role'] ?? null, fn (Builder $query, $role) => $query->where('role', $role))
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status'] === 'active'))
             ->latest()->paginate(25);
+
         return response()->json(['users' => $users->through(fn (User $user) => [
             'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'role' => $user->role,
             'status' => (bool) $user->status, 'created_at' => $user->created_at?->toIso8601String(),
@@ -83,9 +85,12 @@ class AdminController extends Controller
         $before = ['status' => (bool) $user->status, 'role' => $user->role];
         DB::transaction(function () use ($request, $admin, $user, $data, $before) {
             $user->update(array_intersect_key($data, array_flip(['status', 'role'])));
-            if (array_key_exists('status', $data)) $user->jobSeeker?->update(['status' => $data['status']]);
+            if (array_key_exists('status', $data)) {
+                $user->jobSeeker?->update(['status' => $data['status']]);
+            }
             $this->audit->record($request, $admin, 'user.updated', $user, $before, ['status' => (bool) $user->status, 'role' => $user->role]);
         });
+
         return response()->json(['message' => 'Account updated.']);
     }
 
@@ -95,6 +100,7 @@ class AdminController extends Controller
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:120'], 'verification_status' => ['nullable', Rule::in(['unverified', 'pending', 'verified', 'rejected'])]]);
         $rows = Employer::with('user:id,name,email,status')->withCount(['reviews as approved_reviews_count' => fn ($reviews) => $reviews->where('status', 'approved')])->withAvg(['reviews as approved_reviews_avg_rating' => fn ($reviews) => $reviews->where('status', 'approved')], 'rating')->when($filters['q'] ?? null, fn (Builder $query, $q) => $query->where(fn (Builder $match) => $match->where('company_name', 'like', "%{$q}%")->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$q}%"))))
             ->when($filters['verification_status'] ?? null, fn (Builder $query, $status) => $query->where('verification_status', $status))->latest()->paginate(25);
+
         return response()->json(['employers' => $rows->through(fn (Employer $employer) => [
             'id' => $employer->id, 'user_id' => $employer->user_id, 'company_name' => $employer->company_name,
             'description' => $employer->company_description, 'location' => $employer->location, 'website_url' => $employer->website_url,
@@ -110,7 +116,9 @@ class AdminController extends Controller
     {
         $admin = $this->authorizeAdmin($request);
         $data = $request->validate(['decision' => ['required', Rule::in(['approve', 'reject', 'reset'])], 'notes' => ['nullable', 'string', 'max:2000', 'required_if:decision,reject']]);
-        $status = match ($data['decision']) { 'approve' => 'verified', 'reject' => 'rejected', default => 'unverified' };
+        $status = match ($data['decision']) {
+            'approve' => 'verified', 'reject' => 'rejected', default => 'unverified'
+        };
         $before = ['is_verified' => (bool) $employer->is_verified, 'verification_status' => $employer->verification_status];
         DB::transaction(function () use ($request, $admin, $employer, $status, $data, $before) {
             $employer->update([
@@ -120,6 +128,7 @@ class AdminController extends Controller
             ]);
             $this->audit->record($request, $admin, 'employer.verification.'.$data['decision'], $employer, $before, ['is_verified' => $employer->is_verified, 'verification_status' => $status, 'notes' => $data['notes'] ?? null]);
         });
+
         return response()->json(['message' => 'Employer verification updated.', 'verification_status' => $status]);
     }
 
@@ -132,6 +141,7 @@ class AdminController extends Controller
             ->when(($filters['status'] ?? null) === 'expired', fn (Builder $query) => $query->where('status', 'published')->whereDate('application_deadline', '<', today()))
             ->when(isset($filters['status']) && $filters['status'] !== 'expired', fn (Builder $query) => $query->where('status', $filters['status']))
             ->when($filters['category_id'] ?? null, fn (Builder $query, $categoryId) => $query->where('category_id', $categoryId))->latest()->paginate(25);
+
         return response()->json([
             'jobs' => $rows->through(fn (Job $job) => ['id' => $job->id, 'title' => $job->title, 'company' => $job->employer?->company_name, 'category' => $job->jobCategory?->name ?? $job->category, 'category_id' => $job->category_id, 'location' => $job->location, 'description' => $job->description, 'requirements' => $job->requirements, 'salary_min' => $job->salary_min, 'salary_max' => $job->salary_max, 'status' => $job->application_deadline?->isBefore(today()) && $job->status === 'published' ? 'expired' : $job->status, 'applications_count' => $job->applications_count, 'created_at' => $job->created_at?->toIso8601String(), 'deadline' => $job->application_deadline?->toDateString()]),
             'categories' => JobCategory::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
@@ -142,12 +152,15 @@ class AdminController extends Controller
     {
         $admin = $this->authorizeAdmin($request);
         $data = $request->validate(['status' => ['required', Rule::in(['draft', 'published', 'paused', 'closed'])]]);
-        if ($data['status'] === 'published' && $job->application_deadline?->isBefore(today())) abort(422, 'An expired job cannot be published. Update its expiry date first.');
+        if ($data['status'] === 'published' && $job->application_deadline?->isBefore(today())) {
+            abort(422, 'An expired job cannot be published. Update its expiry date first.');
+        }
         $before = ['status' => $job->status];
         DB::transaction(function () use ($request, $admin, $job, $data, $before) {
             $job->update(['status' => $data['status']]);
             $this->audit->record($request, $admin, 'job.moderated', $job, $before, ['status' => $job->status]);
         });
+
         return response()->json(['message' => 'Job listing status updated.']);
     }
 
@@ -155,6 +168,7 @@ class AdminController extends Controller
     {
         $this->authorizeAdmin($request);
         $rows = Application::with(['job:id,title,employer_id', 'job.employer:id,company_name'])->latest('submitted_at')->paginate(25);
+
         return response()->json(['applications' => $rows->through(fn (Application $application) => ['id' => $application->id, 'job_title' => $application->job?->title, 'company' => $application->job?->employer?->company_name, 'status' => $application->status, 'submitted_at' => $application->submitted_at?->toIso8601String()])]);
     }
 
@@ -166,6 +180,7 @@ class AdminController extends Controller
             ->when($filters['q'] ?? null, fn (Builder $query, $q) => $query->where('name', 'like', "%{$q}%"))
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('is_active', $filters['status'] === 'active'))
             ->orderBy('sort_order')->orderBy('name')->paginate(25);
+
         return response()->json(['categories' => $categories->through(fn (JobCategory $category) => ['id' => $category->id, 'name' => $category->name, 'slug' => $category->slug, 'is_active' => $category->is_active, 'sort_order' => $category->sort_order, 'jobs_count' => $category->jobs_count, 'created_at' => $category->created_at?->toIso8601String()])]);
     }
 
@@ -177,12 +192,16 @@ class AdminController extends Controller
         abort_if($slug === '', 422, 'Category name must contain letters or numbers.');
         $baseSlug = $slug;
         $suffix = 2;
-        while (JobCategory::where('slug', $slug)->exists()) $slug = $baseSlug.'-'.$suffix++;
+        while (JobCategory::where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$suffix++;
+        }
         $category = DB::transaction(function () use ($request, $admin, $data, $slug) {
             $category = JobCategory::create(['name' => trim($data['name']), 'slug' => $slug, 'sort_order' => $data['sort_order'] ?? 0, 'is_active' => $data['is_active'] ?? true]);
             $this->audit->record($request, $admin, 'job_category.created', $category, null, ['name' => $category->name, 'is_active' => $category->is_active, 'sort_order' => $category->sort_order]);
+
             return $category;
         });
+
         return response()->json(['message' => 'Job category created.', 'category' => $category], 201);
     }
 
@@ -201,15 +220,20 @@ class AdminController extends Controller
             abort_if($baseSlug === '', 422, 'Category name must contain letters or numbers.');
             $slug = $baseSlug;
             $suffix = 2;
-            while (JobCategory::where('slug', $slug)->where('id', '!=', $jobCategory->id)->exists()) $slug = $baseSlug.'-'.$suffix++;
+            while (JobCategory::where('slug', $slug)->where('id', '!=', $jobCategory->id)->exists()) {
+                $slug = $baseSlug.'-'.$suffix++;
+            }
             $data['slug'] = $slug;
         }
         $before = ['name' => $jobCategory->name, 'is_active' => $jobCategory->is_active, 'sort_order' => $jobCategory->sort_order];
         DB::transaction(function () use ($request, $admin, $jobCategory, $data, $before) {
             $jobCategory->update($data);
-            if (isset($data['name'])) Job::where('category_id', $jobCategory->id)->update(['category' => $jobCategory->name]);
+            if (isset($data['name'])) {
+                Job::where('category_id', $jobCategory->id)->update(['category' => $jobCategory->name]);
+            }
             $this->audit->record($request, $admin, 'job_category.updated', $jobCategory, $before, ['name' => $jobCategory->name, 'is_active' => $jobCategory->is_active, 'sort_order' => $jobCategory->sort_order]);
         });
+
         return response()->json(['message' => 'Job category updated.', 'category' => $jobCategory->fresh()]);
     }
 
@@ -221,6 +245,7 @@ class AdminController extends Controller
             ->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status))
             ->when($filters['q'] ?? null, fn (Builder $query, $q) => $query->where(fn (Builder $match) => $match->where('review', 'like', "%{$q}%")->orWhereHas('employer', fn ($employer) => $employer->where('company_name', 'like', "%{$q}%"))->orWhereHas('jobSeeker.user', fn ($user) => $user->where('name', 'like', "%{$q}%"))))
             ->latest()->paginate(25);
+
         return response()->json(['reviews' => $reviews->through(fn (EmployerReview $review) => ['id' => $review->id, 'employer' => $review->employer?->company_name, 'reviewer' => $review->jobSeeker?->user?->name, 'job_title' => $review->application?->job?->title, 'rating' => $review->rating, 'title' => $review->title, 'review' => $review->review, 'status' => $review->status, 'moderation_notes' => $review->moderation_notes, 'created_at' => $review->created_at?->toIso8601String()])]);
     }
 
@@ -233,6 +258,7 @@ class AdminController extends Controller
             $employerReview->update(['status' => $data['decision'] === 'approve' ? 'approved' : 'rejected', 'moderation_notes' => $data['notes'] ?? null, 'moderated_by' => $admin->id, 'moderated_at' => now()]);
             $this->audit->record($request, $admin, 'employer_review.'.$data['decision'], $employerReview, $before, ['status' => $employerReview->status, 'notes' => $employerReview->moderation_notes]);
         });
+
         return response()->json(['message' => 'Employer review moderated.', 'status' => $employerReview->status]);
     }
 
@@ -252,6 +278,7 @@ class AdminController extends Controller
             ->when($filters['from'] ?? null, fn (Builder $query, $from) => $query->whereDate('created_at', '>=', $from))
             ->when($filters['to'] ?? null, fn (Builder $query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest('created_at')->paginate(30)->withQueryString();
+
         return response()->json(['actions' => AdminAuditLog::query()->distinct()->orderBy('action')->pluck('action'), 'administrators' => User::where('role', 'admin')->orderBy('name')->get(['id', 'name']), 'logs' => $logs->through(fn (AdminAuditLog $log) => ['id' => $log->id, 'administrator_id' => $log->administrator_id, 'administrator' => $log->administrator?->name ?? '[Deleted account]', 'action' => $log->action, 'target_type' => $log->target_type, 'target_id' => $log->target_id, 'before' => $log->before, 'after' => $log->after, 'ip_address' => $log->ip_address, 'created_at' => $log->created_at?->toIso8601String()])]);
     }
 
@@ -259,13 +286,16 @@ class AdminController extends Controller
     {
         $user = $request->user();
         $data = $request->validate(['target_type' => ['required', Rule::in(['job', 'employer', 'user'])], 'target_id' => ['required', 'integer', 'min:1'], 'reason' => ['required', Rule::in(['fraud', 'misleading', 'abusive', 'inappropriate', 'other'])], 'details' => ['nullable', 'string', 'max:2000']]);
-        if ($data['target_type'] === 'job') Job::findOrFail($data['target_id']);
-        elseif ($data['target_type'] === 'employer') Employer::findOrFail($data['target_id']);
-        else {
+        if ($data['target_type'] === 'job') {
+            Job::findOrFail($data['target_id']);
+        } elseif ($data['target_type'] === 'employer') {
+            Employer::findOrFail($data['target_id']);
+        } else {
             $target = User::findOrFail($data['target_id']);
             abort_if($target->id === $user->id, 422, 'An account cannot report itself.');
         }
         $report = ContentReport::create([...$data, 'reported_by' => $user->id]);
+
         return response()->json(['message' => 'Report submitted for review.', 'id' => $report->id], 201);
     }
 
@@ -274,6 +304,7 @@ class AdminController extends Controller
         $this->authorizeAdmin($request);
         $filters = $request->validate(['status' => ['nullable', Rule::in(['open', 'actioned', 'dismissed'])]]);
         $rows = ContentReport::with(['reporter:id,name,email'])->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status))->latest()->paginate(25);
+
         return response()->json(['reports' => $rows->through(function (ContentReport $report) {
             $target = match ($report->target_type) {
                 'job' => Job::find($report->target_id),
@@ -285,6 +316,7 @@ class AdminController extends Controller
                 'employer' => $target?->company_name ?? '[Removed employer]',
                 default => $target?->name ?? '[Removed user]',
             };
+
             return ['id' => $report->id, 'target_type' => $report->target_type, 'target_id' => $report->target_id, 'target_label' => $label, 'reason' => $report->reason, 'details' => $report->details, 'status' => $report->status, 'created_at' => $report->created_at?->toIso8601String(), 'reporter' => $report->reporter?->name];
         })]);
     }
@@ -296,7 +328,9 @@ class AdminController extends Controller
         $before = ['status' => $report->status];
         DB::transaction(function () use ($request, $report, $data, $admin, $before) {
             if ($data['decision'] === 'actioned') {
-                if ($report->target_type === 'job') Job::whereKey($report->target_id)->update(['status' => 'closed']);
+                if ($report->target_type === 'job') {
+                    Job::whereKey($report->target_id)->update(['status' => 'closed']);
+                }
                 if (in_array($report->target_type, ['user', 'employer'], true)) {
                     $reportedUser = $report->target_type === 'employer'
                         ? Employer::find($report->target_id)?->user
@@ -310,6 +344,7 @@ class AdminController extends Controller
             $report->update(['status' => $data['decision'], 'reviewed_by' => $admin->id, 'reviewed_at' => now()]);
             $this->audit->record($request, $admin, 'content_report.'.$data['decision'], $report, $before, ['status' => $report->status, 'target_type' => $report->target_type, 'target_id' => $report->target_id]);
         });
+
         return response()->json(['message' => 'Report reviewed.']);
     }
 }

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onUnmounted, reactive, ref } from 'vue';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const source = bootstrap.profile ?? {};
@@ -195,6 +195,7 @@ function updateProfileFromResponse(updated) {
 }
 
 let successTimer;
+onUnmounted(() => clearTimeout(successTimer));
 async function saveProfile() {
     if (saving.value || !hasChanges.value) return;
     saving.value = true;

@@ -9,6 +9,13 @@ class Region extends Model
 {
     protected $fillable = ['name', 'type', 'sort_order'];
 
-    public function townships(): HasMany { return $this->hasMany(Township::class); }
-    public function featuredCities(): HasMany { return $this->hasMany(FeaturedCity::class); }
+    public function townships(): HasMany
+    {
+        return $this->hasMany(Township::class);
+    }
+
+    public function featuredCities(): HasMany
+    {
+        return $this->hasMany(FeaturedCity::class);
+    }
 }

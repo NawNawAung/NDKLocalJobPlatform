@@ -15,16 +15,51 @@ class JobSeeker extends Model
         'work_mode', 'expected_salary_min', 'expected_salary_max', 'availability', 'profile_searchable', 'portfolio_url', 'social_links',
         'skills', 'languages', 'status', 'job_alerts_enabled', 'bio',
     ];
-    protected function casts(): array { return ['skills' => 'array', 'languages' => 'array', 'social_links' => 'array', 'status' => 'boolean', 'job_alerts_enabled' => 'boolean', 'profile_searchable' => 'boolean']; }
 
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
-    public function region(): BelongsTo { return $this->belongsTo(Region::class); }
-    public function township(): BelongsTo { return $this->belongsTo(Township::class); }
-    public function applications(): HasMany { return $this->hasMany(Application::class); }
-    public function employerReviews(): HasMany { return $this->hasMany(EmployerReview::class); }
-    public function savedJobs(): HasMany { return $this->hasMany(SavedJob::class); }
-    public function experiences(): HasMany { return $this->hasMany(JobSeekerExperience::class)->orderBy('sort_order')->orderByDesc('started_on'); }
-    public function educations(): HasMany { return $this->hasMany(JobSeekerEducation::class)->orderBy('sort_order')->orderByDesc('graduated_year'); }
+    protected function casts(): array
+    {
+        return ['skills' => 'array', 'languages' => 'array', 'social_links' => 'array', 'status' => 'boolean', 'job_alerts_enabled' => 'boolean', 'profile_searchable' => 'boolean'];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
+    }
+
+    public function township(): BelongsTo
+    {
+        return $this->belongsTo(Township::class);
+    }
+
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class);
+    }
+
+    public function employerReviews(): HasMany
+    {
+        return $this->hasMany(EmployerReview::class);
+    }
+
+    public function savedJobs(): HasMany
+    {
+        return $this->hasMany(SavedJob::class);
+    }
+
+    public function experiences(): HasMany
+    {
+        return $this->hasMany(JobSeekerExperience::class)->orderBy('sort_order')->orderByDesc('started_on');
+    }
+
+    public function educations(): HasMany
+    {
+        return $this->hasMany(JobSeekerEducation::class)->orderBy('sort_order')->orderByDesc('graduated_year');
+    }
 
     public function searchJobs(array $filters = []): Builder
     {
@@ -54,7 +89,18 @@ class JobSeeker extends Model
         return $application;
     }
 
-    public function saveJob(Job $job): SavedJob { return $this->savedJobs()->firstOrCreate(['job_id' => $job->id]); }
-    public function removeSavedJob(Job $job): bool { return (bool) $this->savedJobs()->where('job_id', $job->id)->delete(); }
-    public function updateProfile(array $attributes): bool { return $this->fill($attributes)->save(); }
+    public function saveJob(Job $job): SavedJob
+    {
+        return $this->savedJobs()->firstOrCreate(['job_id' => $job->id]);
+    }
+
+    public function removeSavedJob(Job $job): bool
+    {
+        return (bool) $this->savedJobs()->where('job_id', $job->id)->delete();
+    }
+
+    public function updateProfile(array $attributes): bool
+    {
+        return $this->fill($attributes)->save();
+    }
 }

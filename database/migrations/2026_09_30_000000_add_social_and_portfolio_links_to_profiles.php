@@ -30,13 +30,21 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('employers', function (Blueprint $table) {
-            if (Schema::hasColumn('employers', 'social_links')) $table->dropColumn('social_links');
-            if (Schema::hasColumn('employers', 'website_url')) $table->dropColumn('website_url');
+            if (Schema::hasColumn('employers', 'social_links')) {
+                $table->dropColumn('social_links');
+            }
+            if (Schema::hasColumn('employers', 'website_url')) {
+                $table->dropColumn('website_url');
+            }
         });
 
         Schema::table('job_seekers', function (Blueprint $table) {
-            if (Schema::hasColumn('job_seekers', 'social_links')) $table->dropColumn('social_links');
-            if (Schema::hasColumn('job_seekers', 'portfolio_url')) $table->dropColumn('portfolio_url');
+            if (Schema::hasColumn('job_seekers', 'social_links')) {
+                $table->dropColumn('social_links');
+            }
+            if (Schema::hasColumn('job_seekers', 'portfolio_url')) {
+                $table->dropColumn('portfolio_url');
+            }
         });
     }
 };

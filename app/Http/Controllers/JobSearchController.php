@@ -61,7 +61,9 @@ class JobSearchController extends Controller
                 $township = Township::find($filters['township_id']);
                 $query->where(function (Builder $location) use ($filters, $township) {
                     $location->where('township_id', $filters['township_id']);
-                    if ($township) $location->orWhere('location', 'like', "%{$township->name}%");
+                    if ($township) {
+                        $location->orWhere('location', 'like', "%{$township->name}%");
+                    }
                 });
             })
             ->when($filters['category_id'] ?? null, fn (Builder $query, int $categoryId) => $query->where('category_id', $categoryId))

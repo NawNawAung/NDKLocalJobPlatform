@@ -8,7 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class JobCategory extends Model
 {
     protected $table = 'job_categories';
+
     protected $fillable = ['name', 'slug', 'is_active', 'sort_order'];
-    protected function casts(): array { return ['is_active' => 'boolean']; }
-    public function jobs(): HasMany { return $this->hasMany(Job::class, 'category_id'); }
+
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
+    }
+
+    public function jobs(): HasMany
+    {
+        return $this->hasMany(Job::class, 'category_id');
+    }
 }

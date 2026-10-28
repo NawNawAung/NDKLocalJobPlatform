@@ -10,8 +10,23 @@ class Message extends Model
 {
     protected $fillable = ['conversation_id', 'sender_id', 'body'];
 
-    public function conversation(): BelongsTo { return $this->belongsTo(Conversation::class); }
-    public function sender(): BelongsTo { return $this->belongsTo(User::class, 'sender_id'); }
-    public function reads(): HasMany { return $this->hasMany(MessageRead::class); }
-    public function attachments(): HasMany { return $this->hasMany(MessageAttachment::class); }
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
+    }
+
+    public function sender(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function reads(): HasMany
+    {
+        return $this->hasMany(MessageRead::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(MessageAttachment::class);
+    }
 }

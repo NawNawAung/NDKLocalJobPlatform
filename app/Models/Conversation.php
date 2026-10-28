@@ -12,11 +12,30 @@ class Conversation extends Model
 {
     protected $fillable = ['application_id', 'created_by'];
 
-    public function application(): BelongsTo { return $this->belongsTo(Application::class); }
-    public function participants(): BelongsToMany { return $this->belongsToMany(User::class, 'conversation_participants')->withPivot(['id', 'joined_at'])->withTimestamps(); }
-    public function participantRecords(): HasMany { return $this->hasMany(ConversationParticipant::class); }
-    public function messages(): HasMany { return $this->hasMany(Message::class); }
-    public function latestMessage(): HasOne { return $this->hasOne(Message::class)->latestOfMany(); }
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(Application::class);
+    }
+
+    public function participants(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'conversation_participants')->withPivot(['id', 'joined_at'])->withTimestamps();
+    }
+
+    public function participantRecords(): HasMany
+    {
+        return $this->hasMany(ConversationParticipant::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function latestMessage(): HasOne
+    {
+        return $this->hasOne(Message::class)->latestOfMany();
+    }
 
     public function hasParticipant(User $user): bool
     {

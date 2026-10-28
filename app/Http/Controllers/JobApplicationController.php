@@ -92,7 +92,9 @@ class JobApplicationController extends Controller
                     throw ValidationException::withMessages(['application' => 'You have already applied for this job.']);
                 }
 
-                if ($request->hasFile('cv')) $storedPath = $request->file('cv')->store('job-seeker-cvs', 'local');
+                if ($request->hasFile('cv')) {
+                    $storedPath = $request->file('cv')->store('job-seeker-cvs', 'local');
+                }
                 $application = $seeker->applyForJob($job, [
                     'cover_letter' => $data['cover_letter'] ?? null,
                     'cv_path' => $storedPath ?: $seeker->cv_path,
@@ -101,10 +103,13 @@ class JobApplicationController extends Controller
                 if ($job->employer?->user) {
                     Notification::sendNotification($job->employer->user, 'New job application', "{$request->user()->name} applied for {$job->title}.", null, 'application', '/#pipeline');
                 }
+
                 return $application;
             });
         } catch (\Throwable $exception) {
-            if ($storedPath) Storage::disk('local')->delete($storedPath);
+            if ($storedPath) {
+                Storage::disk('local')->delete($storedPath);
+            }
             if ($exception instanceof UniqueConstraintViolationException) {
                 throw ValidationException::withMessages(['application' => 'You have already applied for this job.']);
             }
@@ -124,6 +129,7 @@ class JobApplicationController extends Controller
         abort_unless($seeker, 403);
         $job = Job::published()->findOrFail($jobId);
         $saved = $seeker->saveJob($job);
+
         return response()->json(['saved' => true, 'saved_at' => $saved->saved_at?->toIso8601String()]);
     }
 
@@ -133,6 +139,7 @@ class JobApplicationController extends Controller
         $seeker = $request->user()->jobSeeker;
         abort_unless($seeker, 403);
         $seeker->savedJobs()->where('job_id', $jobId)->delete();
+
         return response()->json(['saved' => false]);
     }
 }

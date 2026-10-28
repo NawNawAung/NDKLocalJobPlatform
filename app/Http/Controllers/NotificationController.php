@@ -31,12 +31,14 @@ class NotificationController extends Controller
     {
         abort_unless($notification->user_id === $request->user()->id, 404);
         $notification->markAsRead();
+
         return response()->json(['ok' => true]);
     }
 
     public function markAllRead(Request $request): JsonResponse
     {
         $request->user()->notifications()->where('is_read', false)->update(['is_read' => true]);
+
         return response()->json(['ok' => true]);
     }
 
@@ -44,6 +46,7 @@ class NotificationController extends Controller
     {
         abort_unless($notification->user_id === $request->user()->id, 404);
         $notification->deleteNotification();
+
         return response()->json(['ok' => true]);
     }
 }

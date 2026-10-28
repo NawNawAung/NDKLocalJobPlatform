@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\RedirectResponse;
+use App\Models\Region;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use App\Models\Region;
-use App\Models\User;
 
 class AuthController extends Controller
 {
@@ -29,6 +29,7 @@ class AuthController extends Controller
     public function profilePage(): View
     {
         abort_unless(Auth::user()?->role === 'job_seeker', 403);
+
         return $this->appView(null, 'profile');
     }
 
@@ -65,10 +66,12 @@ class AuthController extends Controller
 
         if (! $request->user()->status) {
             Auth::logout();
+
             return back()->withErrors(['email' => 'This account is inactive.'])->onlyInput('email');
         }
 
         $request->session()->regenerate();
+
         return redirect()->intended('/');
     }
 
@@ -136,8 +139,8 @@ class AuthController extends Controller
             'educations.*.institution' => ['required', 'string', 'max:180'],
             'educations.*.qualification' => ['nullable', 'string', 'max:160'],
             'educations.*.field_of_study' => ['nullable', 'string', 'max:160'],
-            'educations.*.started_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
-            'educations.*.graduated_year' => ['nullable', 'integer', 'min:1900', 'max:' . (now()->year + 10)],
+            'educations.*.started_year' => ['nullable', 'integer', 'min:1900', 'max:'.now()->year],
+            'educations.*.graduated_year' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 10)],
             'educations.*.description' => ['nullable', 'string', 'max:3000'],
         ]);
         $this->validateSalaryRange($attributes);
@@ -202,6 +205,7 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect('/');
     }
 
@@ -256,8 +260,8 @@ class AuthController extends Controller
             'educations.*.institution' => ['required', 'string', 'max:180'],
             'educations.*.qualification' => ['nullable', 'string', 'max:160'],
             'educations.*.field_of_study' => ['nullable', 'string', 'max:160'],
-            'educations.*.started_year' => ['nullable', 'integer', 'min:1900', 'max:' . now()->year],
-            'educations.*.graduated_year' => ['nullable', 'integer', 'min:1900', 'max:' . (now()->year + 10)],
+            'educations.*.started_year' => ['nullable', 'integer', 'min:1900', 'max:'.now()->year],
+            'educations.*.graduated_year' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 10)],
             'educations.*.description' => ['nullable', 'string', 'max:3000'],
         ]);
         $this->validateSalaryRange($attributes);
@@ -309,8 +313,12 @@ class AuthController extends Controller
             $jobSeeker->educations()->delete();
             $jobSeeker->educations()->createMany($attributes['educations'] ?? []);
         });
-        if ($request->hasFile('profile_photo') && $previousPhoto) Storage::disk('public')->delete($previousPhoto);
-        if ($request->hasFile('cv') && $previousResume) Storage::disk('local')->delete($previousResume);
+        if ($request->hasFile('profile_photo') && $previousPhoto) {
+            Storage::disk('public')->delete($previousPhoto);
+        }
+        if ($request->hasFile('cv') && $previousResume) {
+            Storage::disk('local')->delete($previousResume);
+        }
 
         if ($request->expectsJson()) {
             $freshProfile = $jobSeeker->fresh()->load([
@@ -335,6 +343,7 @@ class AuthController extends Controller
     {
         $jobSeeker = $request->user()->jobSeeker;
         abort_unless($request->user()->role === 'job_seeker' && $jobSeeker?->cv_path, 404);
+
         return Storage::disk('local')->download($jobSeeker->cv_path, basename($jobSeeker->cv_original_name ?: $jobSeeker->cv_path));
     }
 
