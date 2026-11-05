@@ -7,7 +7,7 @@
 @source '../**/*.vue';
 
 @theme {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Inter', 'Noto Sans Myanmar', 'Myanmar Text', Padauk, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
     --color-blue-50: #eff6ff;
     --color-blue-100: #dbeafe;
@@ -39,10 +39,11 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Pages were originally delivered with their own nav/footer. The app shell
-   now renders one shared pair, while these selectors retain the page bodies. */
-#page-content > div > :first-child { display: none !important; }
-#page-content > div > :last-child { display: none !important; }
+:lang(my) body,
+body[data-locale='my'] {
+    line-height: 1.7;
+    letter-spacing: 0;
+}
 
 .site-header { border-color: #dce4ef; }
 .site-nav-link:focus-visible,

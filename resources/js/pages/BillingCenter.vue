@@ -95,8 +95,8 @@ onMounted(load);
     <section class="min-h-[70vh] bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-6xl">
             <div class="mb-7"><p class="text-sm font-semibold text-[var(--brand-primary)]">Employer account</p><h1 class="mt-1 text-3xl font-bold tracking-tight text-[var(--brand-ink)]">Plans &amp; billing</h1><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose an employer plan or purchase visibility for a published job. Job seekers continue to search and apply for free.</p></div>
-            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }}</p>
-            <p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
+            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ $t(error) }}</p>
+            <p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ $t(notice) }}</p>
             <div v-if="loading" class="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading plans and orders…</div>
             <template v-else-if="data">
                 <section class="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">

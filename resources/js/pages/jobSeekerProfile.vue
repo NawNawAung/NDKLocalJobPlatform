@@ -321,8 +321,8 @@ async function submitEmployerReview(application) {
 <template>
     <section v-if="profile.user.name" class="min-h-[60vh] bg-slate-50 px-4 py-8 pb-32 sm:px-8 sm:py-12 sm:pb-32">
         <div class="mx-auto max-w-6xl">
-            <div v-if="successMessage" class="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm" role="status" aria-live="polite"><i class="ti ti-circle-check mt-0.5 text-lg" aria-hidden="true" /><span>{{ successMessage }}</span><button type="button" class="ml-auto text-emerald-800 hover:text-emerald-950" aria-label="Dismiss message" @click="successMessage = ''"><i class="ti ti-x" aria-hidden="true" /></button></div>
-            <div v-if="errorMessage" class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ errorMessage }}</div>
+            <div v-if="successMessage" class="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm" role="status" aria-live="polite"><i class="ti ti-circle-check mt-0.5 text-lg" aria-hidden="true" /><span>{{ $t(successMessage) }}</span><button type="button" class="ml-auto text-emerald-800 hover:text-emerald-950" aria-label="Dismiss message" @click="successMessage = ''"><i class="ti ti-x" aria-hidden="true" /></button></div>
+            <div v-if="errorMessage" class="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ $t(errorMessage) }}</div>
 
             <form id="profile-form" class="space-y-6" @submit.prevent="saveProfile">
                 <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8" aria-labelledby="profile-heading">

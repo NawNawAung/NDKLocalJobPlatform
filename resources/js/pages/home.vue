@@ -105,75 +105,75 @@ onMounted(async () => {
       <div class="bg-white min-h-screen">
         <div class="bg-gradient-to-br from-blue-50 via-white to-slate-100 px-5 py-16 sm:px-8 sm:py-20">
           <div class="mx-auto max-w-5xl text-center">
-            <div class="mb-3 text-4xl font-extrabold tracking-tight text-[var(--brand-ink)] leading-tight sm:text-5xl">{{ isEmployer ? 'Explore Myanmar’s Job Market' : 'Find Your Next Opportunity in Myanmar' }}</div>
-            <div class="mx-auto mb-8 max-w-2xl text-base leading-6 text-slate-600">{{ isEmployer ? 'Review public listings from other employers to understand current roles, locations, and compensation.' : 'Search open roles by title, location, experience, work arrangement, and salary.' }}</div>
+            <div class="mb-3 text-4xl font-extrabold tracking-tight text-[var(--brand-ink)] leading-tight sm:text-5xl">{{ isEmployer ? $t('Explore Myanmar’s Job Market') : $t('Find Your Next Opportunity in Myanmar') }}</div>
+            <div class="mx-auto mb-8 max-w-2xl text-base leading-6 text-slate-600">{{ isEmployer ? $t('Review public listings from other employers to understand current roles, locations, and compensation.') : $t('Search open roles by title, location, experience, work arrangement, and salary.') }}</div>
             <form class="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-lg shadow-blue-900/5 sm:p-6" @submit.prevent="submitSearch">
               <div class="grid gap-4 md:grid-cols-[1.25fr_1fr_1fr_auto]">
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Job title or keyword</span>
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Job title or keyword') }}</span>
                   <span class="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-3 focus-within:border-[var(--brand-primary)] focus-within:ring-4 focus-within:ring-blue-100">
                     <i class="ti ti-search text-slate-400" aria-hidden="true" />
-                    <input v-model="keyword" type="search" class="w-full text-sm text-slate-800 outline-none" placeholder="e.g. Accountant, Python, sales" />
+                    <input v-model="keyword" type="search" class="w-full text-sm text-slate-800 outline-none" :placeholder="$t('e.g. Accountant, Python, sales')" />
                   </span>
                 </label>
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Region or state</span>
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Region or state') }}</span>
                   <select v-model="regionId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" @change="townshipId = ''">
-                    <option value="">All Myanmar</option>
-                    <option v-for="region in regions" :key="region.id" :value="String(region.id)">{{ region.name }} {{ region.type === 'state' ? 'State' : region.type === 'union_territory' ? 'Union Territory' : 'Region' }}</option>
+                    <option value="">{{ $t('All Myanmar') }}</option>
+                    <option v-for="region in regions" :key="region.id" :value="String(region.id)">{{ region.name }} {{ $t(region.type === 'state' ? 'State' : region.type === 'union_territory' ? 'Union Territory' : 'Region') }}</option>
                   </select>
                 </label>
                 <label class="block">
-                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Township</span>
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Township') }}</span>
                   <select v-model="townshipId" :disabled="!regionId || townships.length === 0" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
-                    <option value="">Any township</option>
+                    <option value="">{{ $t('Any township') }}</option>
                     <option v-for="township in townships" :key="township.id" :value="String(township.id)">{{ township.name }}</option>
                   </select>
                 </label>
-                <button type="submit" class="self-end rounded-lg bg-[var(--brand-primary)] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">Search jobs</button>
+                <button type="submit" class="self-end rounded-lg bg-[var(--brand-primary)] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)]">{{ $t('Search jobs') }}</button>
               </div>
 
               <div class="mt-4 border-t border-slate-100 pt-4">
                 <button type="button" class="inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)]" :aria-expanded="advancedFiltersOpen" @click="advancedFiltersOpen = !advancedFiltersOpen">
                   <i class="ti" :class="advancedFiltersOpen ? 'ti-adjustments-x' : 'ti-adjustments-horizontal'" aria-hidden="true" />
-                  {{ advancedFiltersOpen ? 'Hide filters' : 'More filters' }}
+                  {{ advancedFiltersOpen ? $t('Hide filters') : $t('More filters') }}
                   <i class="ti" :class="advancedFiltersOpen ? 'ti-chevron-up' : 'ti-chevron-down'" aria-hidden="true" />
                 </button>
                 <div v-if="advancedFiltersOpen" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Job category</span>
-                    <select v-model="categoryId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100"><option value="">All categories</option><option v-for="item in categories" :key="item.id" :value="String(item.id)">{{ item.name }}</option></select>
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Job category') }}</span>
+                    <select v-model="categoryId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100"><option value="">{{ $t('All categories') }}</option><option v-for="item in categories" :key="item.id" :value="String(item.id)">{{ item.name }}</option></select>
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Experience</span>
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Experience') }}</span>
                     <select v-model="experienceLevel" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
-                      <option value="">Any experience</option><option value="entry">Entry level (0–1 years)</option><option value="junior">Junior (1–3 years)</option><option value="mid">Mid level (3–5 years)</option><option value="senior">Senior (5+ years)</option><option value="lead">Lead / manager</option>
+                      <option value="">{{ $t('Any experience') }}</option><option value="entry">{{ $t('Entry level (0–1 years)') }}</option><option value="junior">{{ $t('Junior (1–3 years)') }}</option><option value="mid">{{ $t('Mid level (3–5 years)') }}</option><option value="senior">{{ $t('Senior (5+ years)') }}</option><option value="lead">{{ $t('Lead / manager') }}</option>
                     </select>
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Employment type</span>
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Employment type') }}</span>
                     <select v-model="employmentType" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
-                      <option value="">Any employment type</option><option value="full_time">Full time</option><option value="part_time">Part time</option><option value="contract">Contract</option><option value="internship">Internship</option><option value="temporary">Temporary</option>
+                      <option value="">{{ $t('Any employment type') }}</option><option value="full_time">{{ $t('Full time') }}</option><option value="part_time">{{ $t('Part time') }}</option><option value="contract">{{ $t('Contract') }}</option><option value="internship">{{ $t('Internship') }}</option><option value="temporary">{{ $t('Temporary') }}</option>
                     </select>
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Work arrangement</span>
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Work arrangement') }}</span>
                     <select v-model="workMode" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
-                      <option value="">Any work arrangement</option><option value="on_site">On site</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option>
+                      <option value="">{{ $t('Any work arrangement') }}</option><option value="on_site">{{ $t('On site') }}</option><option value="hybrid">{{ $t('Hybrid') }}</option><option value="remote">{{ $t('Remote') }}</option>
                     </select>
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Minimum monthly salary (MMK)</span>
-                    <input v-model="salaryMin" type="number" min="0" step="50000" inputmode="numeric" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" placeholder="No minimum">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Minimum monthly salary (MMK)') }}</span>
+                    <input v-model="salaryMin" type="number" min="0" step="50000" inputmode="numeric" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" :placeholder="$t('No minimum')">
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Maximum monthly salary (MMK)</span>
-                    <input v-model="salaryMax" type="number" min="0" step="50000" inputmode="numeric" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" placeholder="No maximum">
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Maximum monthly salary (MMK)') }}</span>
+                    <input v-model="salaryMax" type="number" min="0" step="50000" inputmode="numeric" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" :placeholder="$t('No maximum')">
                   </label>
                   <label class="block">
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Date posted</span>
+                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $t('Date posted') }}</span>
                     <select v-model="datePosted" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
-                      <option value="">Any time</option><option value="24h">Past 24 hours</option><option value="7d">Past week</option><option value="30d">Past month</option>
+                      <option value="">{{ $t('Any time') }}</option><option value="24h">{{ $t('Past 24 hours') }}</option><option value="7d">{{ $t('Past week') }}</option><option value="30d">{{ $t('Past month') }}</option>
                     </select>
                   </label>
                 </div>

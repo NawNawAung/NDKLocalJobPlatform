@@ -74,6 +74,30 @@ class JobSeekerProfileUpdateTest extends TestCase
             ->assertJsonValidationErrors(['name', 'email']);
     }
 
+    public function test_validation_errors_follow_the_selected_myanmar_language(): void
+    {
+        $user = User::create([
+            'name' => 'Job Seeker',
+            'email' => 'seeker-myanmar@example.test',
+            'password' => 'password123',
+            'role' => 'job_seeker',
+            'status' => true,
+        ]);
+        JobSeeker::create(['user_id' => $user->id, 'status' => true]);
+
+        $response = $this->withCredentials()
+            ->withUnencryptedCookie('ndk_language', 'my')
+            ->actingAs($user)
+            ->postJson('/profile', [
+                '_method' => 'PATCH',
+                'name' => '',
+                'email' => 'seeker-myanmar@example.test',
+            ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('errors.name.0', 'အမည် ကို ဖြည့်သွင်းရန် လိုအပ်ပါသည်။');
+    }
+
     public function test_job_seeker_can_save_separate_shared_hard_and_soft_skills(): void
     {
         $user = User::create([

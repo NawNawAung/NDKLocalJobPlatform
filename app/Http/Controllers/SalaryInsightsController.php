@@ -25,7 +25,9 @@ class SalaryInsightsController extends Controller
         ]);
 
         $options = $insights->options();
-        $filters['currency'] ??= in_array('MMK', $options['currencies'], true) ? 'MMK' : ($options['currencies'][0] ?? null);
+        $filters['currency'] ??= $options['currencies']->contains('MMK')
+            ? 'MMK'
+            : ($options['currencies']->first());
         $matchingListings = $insights->filters($insights->eligibleListings(), $filters);
         $summary = $insights->summary($matchingListings);
         $comparison = [];

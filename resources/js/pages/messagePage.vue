@@ -314,12 +314,12 @@ onUnmounted(() => {
                         <button type="submit" :disabled="sending || (!draft.trim() && !attachments.length)" class="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"><i :class="sending ? 'ti ti-loader-2 animate-spin' : 'ti ti-send'" aria-hidden="true" /><span class="hidden sm:inline">{{ sending ? 'Sending' : 'Send' }}</span></button>
                     </form>
                     <p class="mt-2 text-[11px] text-slate-400">Enter to send · Shift+Enter for a new line · Up to 5 files, 10 MB each</p>
-                    <p v-if="errorMessage" class="mt-2 text-sm text-red-700" role="alert">{{ errorMessage }}</p>
-                    <p v-else-if="successMessage" class="mt-2 text-sm text-emerald-700" role="status">{{ successMessage }}</p>
+                    <p v-if="errorMessage" class="mt-2 text-sm text-red-700" role="alert">{{ $t(errorMessage) }}</p>
+                    <p v-else-if="successMessage" class="mt-2 text-sm text-emerald-700" role="status">{{ $t(successMessage) }}</p>
                 </div>
             </div>
             <div v-else class="hidden min-w-0 flex-1 items-center justify-center bg-slate-50/50 p-8 text-center md:flex">
-                <div class="max-w-md"><i class="ti ti-messages mx-auto text-5xl text-blue-200" aria-hidden="true" /><h2 class="mt-4 text-lg font-semibold text-slate-800">Choose a conversation</h2><p class="mt-2 text-sm leading-6 text-slate-500">Select a person from your inbox to read and reply to messages.</p><p v-if="errorMessage" class="mt-4 text-sm text-red-700" role="alert">{{ errorMessage }}</p></div>
+                <div class="max-w-md"><i class="ti ti-messages mx-auto text-5xl text-blue-200" aria-hidden="true" /><h2 class="mt-4 text-lg font-semibold text-slate-800">Choose a conversation</h2><p class="mt-2 text-sm leading-6 text-slate-500">Select a person from your inbox to read and reply to messages.</p><p v-if="errorMessage" class="mt-4 text-sm text-red-700" role="alert">{{ $t(errorMessage) }}</p></div>
             </div>
         </div>
     </section>

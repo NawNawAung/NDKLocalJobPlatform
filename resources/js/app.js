@@ -18,6 +18,7 @@ import TalentSearch from './pages/TalentSearch.vue';
 import AdminDashboard from './pages/AdminDashboard.vue';
 import SiteHeader from './components/SiteHeader.vue';
 import SiteFooter from './components/SiteFooter.vue';
+import { t } from './i18n.js';
 
 const pages = {
     '#details': JobDetails,
@@ -42,7 +43,7 @@ window.addEventListener('hashchange', () => {
     currentHash.value = window.location.hash;
 });
 
-createApp({
+const app = createApp({
     setup() {
         const currentPage = computed(() => {
             if (authBootstrap.authPage === 'login') return LoginPage;
@@ -73,4 +74,6 @@ createApp({
             h(SiteFooter, { isAuthenticated: authBootstrap.authenticated, userRole: authBootstrap.role }),
         ]);
     },
-}).mount('#app');
+});
+app.config.globalProperties.$t = t;
+app.mount('#app');

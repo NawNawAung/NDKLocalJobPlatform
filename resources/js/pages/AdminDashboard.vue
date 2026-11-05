@@ -115,8 +115,8 @@ onMounted(load);
             <div class="mb-6 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2" role="tablist" aria-label="Administration sections">
                 <button v-for="item in tabs" :key="item.id" type="button" role="tab" :aria-selected="tab === item.id" class="inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2.5 text-sm font-semibold transition" :class="tab === item.id ? 'bg-blue-50 text-blue-900 ring-1 ring-blue-100' : 'text-slate-600 hover:bg-slate-50'" @click="switchTab(item.id)"><i :class="item.icon" aria-hidden="true"/>{{ item.label }}</button>
             </div>
-            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ error }}</p>
-            <p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ notice }}</p>
+            <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ $t(error) }}</p>
+            <p v-if="notice" class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ $t(notice) }}</p>
             <div v-if="loading" class="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"><i class="ti ti-loader-2 mr-2 animate-spin" aria-hidden="true"/>Loading administration data…</div>
 
             <template v-else-if="tab === 'overview'">

@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [\App\Http\Middleware\SetLanguage::class]);
+        $middleware->api(append: [\App\Http\Middleware\SetLanguage::class]);
+        $middleware->encryptCookies(except: ['ndk_language']);
         $middleware->alias([
             'active.account' => \App\Http\Middleware\EnsureAccountIsActive::class,
             'admin' => \App\Http\Middleware\EnsureAdministrator::class,
