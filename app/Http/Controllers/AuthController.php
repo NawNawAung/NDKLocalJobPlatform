@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Region;
+use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -219,6 +220,8 @@ class AuthController extends Controller
             'educations' => collect($request->input('educations', []))->filter(fn ($row) => filled($row['institution'] ?? null))->values()->all(),
         ]);
 
+        $jobSeekerId = $user->jobSeeker->id;
+
         $attributes = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
@@ -244,6 +247,11 @@ class AuthController extends Controller
             'expected_salary_min' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'expected_salary_max' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'skills_text' => ['nullable', 'string', 'max:2000'],
+            'skills_catalog_submitted' => ['sometimes', 'boolean'],
+            'hard_skill_ids' => ['sometimes', 'array', 'max:50'],
+            'hard_skill_ids.*' => ['integer', Rule::exists('skills', 'id')->where('type', 'hard')->where('is_active', true)->where(fn ($query) => $query->where('is_builtin', true)->orWhere('created_by_job_seeker_id', $jobSeekerId))],
+            'soft_skill_ids' => ['sometimes', 'array', 'max:50'],
+            'soft_skill_ids.*' => ['integer', Rule::exists('skills', 'id')->where('type', 'soft')->where('is_active', true)->where(fn ($query) => $query->where('is_builtin', true)->orWhere('created_by_job_seeker_id', $jobSeekerId))],
             'languages_text' => ['nullable', 'string', 'max:1000'],
             'bio' => ['nullable', 'string', 'max:5000'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -290,7 +298,9 @@ class AuthController extends Controller
             'social_links' => collect($attributes['social_links'] ?? [])->filter()->all() ?: null,
             'expected_salary_min' => $attributes['expected_salary_min'] ?? null,
             'expected_salary_max' => $attributes['expected_salary_max'] ?? null,
-            'skills' => $this->parseTags($attributes['skills_text'] ?? ''),
+            'skills' => $request->boolean('skills_catalog_submitted')
+                ? Skill::query()->whereIn('id', array_merge($attributes['hard_skill_ids'] ?? [], $attributes['soft_skill_ids'] ?? []))->orderBy('name')->pluck('name')->all()
+                : $this->parseTags($attributes['skills_text'] ?? ''),
             'languages' => $this->parseTags($attributes['languages_text'] ?? ''),
             'bio' => $attributes['bio'] ?? null,
         ];
@@ -305,9 +315,15 @@ class AuthController extends Controller
 
         $previousPhoto = $jobSeeker->profile_photo_path;
         $previousResume = $jobSeeker->cv_path;
-        DB::transaction(function () use ($user, $userAttributes, $jobSeeker, $profileAttributes, $attributes) {
+        DB::transaction(function () use ($user, $userAttributes, $jobSeeker, $profileAttributes, $attributes, $request) {
             $user->updateProfile($userAttributes);
             $jobSeeker->update($profileAttributes);
+            if ($request->boolean('skills_catalog_submitted')) {
+                $jobSeeker->skillCatalog()->sync(array_values(array_unique(array_merge(
+                    $attributes['hard_skill_ids'] ?? [],
+                    $attributes['soft_skill_ids'] ?? [],
+                ))));
+            }
             $jobSeeker->experiences()->delete();
             $jobSeeker->experiences()->createMany($attributes['experiences'] ?? []);
             $jobSeeker->educations()->delete();
@@ -322,9 +338,11 @@ class AuthController extends Controller
 
         if ($request->expectsJson()) {
             $freshProfile = $jobSeeker->fresh()->load([
-                'region:id,name,type', 'township:id,name', 'experiences', 'educations',
+                'region:id,name,type', 'township:id,name', 'experiences', 'educations', 'skillCatalog:id,name,type',
             ]);
             $profileData = $freshProfile->toArray();
+            $profileData['hard_skills'] = $freshProfile->skillCatalog->where('type', 'hard')->values()->map->only(['id', 'name'])->all();
+            $profileData['soft_skills'] = $freshProfile->skillCatalog->where('type', 'soft')->values()->map->only(['id', 'name'])->all();
             $profileData['user'] = $user->fresh()->only(['name', 'email']);
             $profileData['profile_photo_url'] = $freshProfile->profile_photo_path
                 ? Storage::disk('public')->url($freshProfile->profile_photo_path)
@@ -353,13 +371,18 @@ class AuthController extends Controller
         $seekerProfile = null;
         if ($page === 'profile' && $user?->role === 'job_seeker') {
             $seeker = $user->jobSeeker()->with([
-                'region:id,name,type', 'township:id,name', 'experiences', 'educations',
+                'region:id,name,type', 'township:id,name', 'experiences', 'educations', 'skillCatalog:id,name,type',
                 'applications:id,job_id,job_seeker_id,status,submitted_at,created_at',
                 'applications.job:id,employer_id,title,location',
                 'applications.job.employer:id,user_id,company_name',
             ])->withCount(['applications', 'savedJobs'])->first();
             if ($seeker) {
                 $seekerProfile = [...$seeker->toArray(), 'user' => $user->only(['name', 'email'])];
+                $seekerProfile['hard_skills'] = $seeker->skillCatalog->where('type', 'hard')->values()->map->only(['id', 'name'])->all();
+                $seekerProfile['soft_skills'] = $seeker->skillCatalog->where('type', 'soft')->values()->map->only(['id', 'name'])->all();
+                $seekerProfile['available_skills'] = Skill::query()->where('is_active', true)
+                    ->where(fn ($query) => $query->where('is_builtin', true)->orWhere('created_by_job_seeker_id', $seeker->id))
+                    ->orderBy('type')->orderBy('name')->get(['id', 'name', 'type']);
                 $seekerProfile['employer_reviews_by_id'] = $seeker->employerReviews()->get(['employer_id', 'status', 'rating'])->keyBy('employer_id')->map(fn ($review) => ['status' => $review->status, 'rating' => $review->rating]);
                 $seekerProfile['profile_photo_url'] = $seeker->profile_photo_path
                     ? Storage::disk('public')->url($seeker->profile_photo_path)

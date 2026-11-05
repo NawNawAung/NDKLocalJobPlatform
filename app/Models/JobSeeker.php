@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JobSeeker extends Model
@@ -59,6 +60,21 @@ class JobSeeker extends Model
     public function educations(): HasMany
     {
         return $this->hasMany(JobSeekerEducation::class)->orderBy('sort_order')->orderByDesc('graduated_year');
+    }
+
+    public function skillCatalog(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class)->withTimestamps();
+    }
+
+    public function hardSkills(): BelongsToMany
+    {
+        return $this->skillCatalog()->where('type', 'hard');
+    }
+
+    public function softSkills(): BelongsToMany
+    {
+        return $this->skillCatalog()->where('type', 'soft');
     }
 
     public function searchJobs(array $filters = []): Builder

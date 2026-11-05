@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\JobSeeker;
+use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -71,5 +72,35 @@ class JobSeekerProfileUpdateTest extends TestCase
             'email' => 'invalid-email',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['name', 'email']);
+    }
+
+    public function test_job_seeker_can_save_separate_shared_hard_and_soft_skills(): void
+    {
+        $user = User::create([
+            'name' => 'Skills Candidate',
+            'email' => 'skills@example.test',
+            'password' => 'password123',
+            'role' => 'job_seeker',
+            'status' => true,
+        ]);
+        $seeker = JobSeeker::create(['user_id' => $user->id, 'status' => true]);
+        $hard = Skill::create(['name' => 'Feature Testing Framework', 'type' => 'hard', 'created_by_job_seeker_id' => $seeker->id, 'is_active' => true]);
+        $soft = Skill::create(['name' => 'Active Listening', 'type' => 'soft', 'created_by_job_seeker_id' => $seeker->id, 'is_active' => true]);
+
+        $this->actingAs($user)->postJson('/profile', [
+            '_method' => 'PATCH',
+            'name' => $user->name,
+            'email' => $user->email,
+            'skills_catalog_submitted' => '1',
+            'hard_skill_ids' => [$hard->id],
+            'soft_skill_ids' => [$soft->id],
+        ])->assertOk()
+            ->assertJsonPath('profile.hard_skills.0.name', 'Feature Testing Framework')
+            ->assertJsonPath('profile.soft_skills.0.name', 'Active Listening')
+            ->assertJsonPath('profile.skills.0', 'Active Listening')
+            ->assertJsonPath('profile.skills.1', 'Feature Testing Framework');
+
+        $this->assertDatabaseHas('job_seeker_skill', ['job_seeker_id' => $seeker->id, 'skill_id' => $hard->id]);
+        $this->assertDatabaseHas('job_seeker_skill', ['job_seeker_id' => $seeker->id, 'skill_id' => $soft->id]);
     }
 }

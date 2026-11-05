@@ -11,6 +11,7 @@ use App\Http\Controllers\JobCategoryController;
 use App\Http\Controllers\JobSearchController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SalaryInsightsController;
+use App\Http\Controllers\SkillController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
@@ -20,6 +21,7 @@ Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('job
 Route::get('/api/salary-insights', SalaryInsightsController::class)->name('salary-insights.index');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
 Route::get('/api/job-categories', [JobCategoryController::class, 'index'])->name('job-categories.index');
+Route::get('/api/skills', [SkillController::class, 'index'])->name('skills.index');
 Route::get('/api/employers/{employer}/reviews', [EmployerReviewController::class, 'publicForEmployer'])->name('employer-reviews.index');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->middleware('guest')->name('login');
@@ -34,6 +36,7 @@ Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware([
 Route::get('/profile/resume', [AuthController::class, 'downloadResume'])->middleware(['auth', 'active.account'])->name('profile.resume');
 
 Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () {
+    Route::post('/skills', [SkillController::class, 'store'])->middleware('throttle:20,1')->name('skills.store');
     Route::post('/reports', [AdminController::class, 'report'])->middleware('throttle:5,1')->name('reports.store');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
