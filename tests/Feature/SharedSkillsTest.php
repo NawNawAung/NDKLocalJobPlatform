@@ -23,15 +23,18 @@ class SharedSkillsTest extends TestCase
         $jobSeeker = JobSeeker::create(['user_id' => $user->id, 'status' => true]);
 
         $response = $this->actingAs($user)->postJson('/api/skills', [
-            'name' => '  Figma  ',
+            'name' => '  Specialist Calibration Workflow  ',
             'type' => 'hard',
-        ])->assertCreated()->assertJsonPath('skill.name', 'Figma')->assertJsonPath('skill.type', 'hard');
+        ])->assertCreated()->assertJsonPath('skill.name', 'Specialist Calibration Workflow')->assertJsonPath('skill.type', 'hard');
 
         $this->getJson('/api/skills')->assertOk()->assertJsonFragment([
             'id' => $response->json('skill.id'),
-            'name' => 'Figma',
+            'name' => 'Specialist Calibration Workflow',
             'type' => 'hard',
-        ]);
+        ])->assertJsonFragment(['name' => 'AI Literacy', 'type' => 'hard'])
+            ->assertJsonFragment(['name' => 'Kubernetes', 'type' => 'hard'])
+            ->assertJsonFragment(['name' => 'Cisco IOS', 'type' => 'hard'])
+            ->assertJsonFragment(['name' => 'PC Assembly and Repair', 'type' => 'hard']);
         $this->assertDatabaseHas('skills', [
             'id' => $response->json('skill.id'),
             'created_by_job_seeker_id' => $jobSeeker->id,
@@ -48,7 +51,7 @@ class SharedSkillsTest extends TestCase
         JobSeeker::create(['user_id' => $otherUser->id, 'status' => true]);
         $this->actingAs($otherUser)->getJson('/api/skills')->assertOk()->assertJsonMissingExact([
             'id' => $response->json('skill.id'),
-            'name' => 'Figma',
+            'name' => 'Specialist Calibration Workflow',
             'type' => 'hard',
         ]);
         $this->postJson('/profile', [

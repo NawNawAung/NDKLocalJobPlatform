@@ -44,7 +44,7 @@ const draft = reactive({
     skills_text: old.skills_text ?? (profile.skills ?? []).join(', '),
     hard_skill_ids: (old.hard_skill_ids ?? profile.hard_skills?.map((skill) => skill.id) ?? []).map(Number),
     soft_skill_ids: (old.soft_skill_ids ?? profile.soft_skills?.map((skill) => skill.id) ?? []).map(Number),
-    languages_text: old.languages_text ?? (profile.languages ?? []).join(', '),
+    language_values: (old.languages_text ?? (profile.languages ?? []).join(', ')).split(/[\n,]+/).map((language) => language.trim()).filter(Boolean),
     desired_job_title: old.desired_job_title ?? profile.desired_job_title ?? '',
     employment_type: old.employment_type ?? profile.employment_type ?? '',
     work_mode: old.work_mode ?? profile.work_mode ?? '',
@@ -70,6 +70,15 @@ const cvSelected = ref(false);
 const availableSkills = ref([...(profile.available_skills ?? [])]);
 const hardSkillQuery = ref('');
 const softSkillQuery = ref('');
+const hardSkillPickerOpen = ref(false);
+const softSkillPickerOpen = ref(false);
+const languageQuery = ref('');
+const languagePickerOpen = ref(false);
+const languageOptions = [
+    'Arabic', 'Bengali', 'Burmese', 'Chinese (Mandarin)', 'English', 'Filipino', 'French', 'German',
+    'Hindi', 'Indonesian', 'Italian', 'Japanese', 'Khmer', 'Korean', 'Lao', 'Malay', 'Myanmar',
+    'Nepali', 'Portuguese', 'Russian', 'Sinhala', 'Spanish', 'Tamil', 'Thai', 'Urdu', 'Vietnamese',
+];
 const skillCreateError = ref({ hard: '', soft: '' });
 const skillCreating = ref({ hard: false, soft: false });
 const regions = computed(() => bootstrap.regions ?? []);
@@ -86,7 +95,7 @@ const skillsForCompleteness = computed(() => [...draft.hard_skill_ids, ...draft.
 function skillSuggestions(type, query) {
     const selected = new Set([...draft.hard_skill_ids, ...draft.soft_skill_ids]);
     const term = query.trim().toLocaleLowerCase();
-    return availableSkills.value.filter((skill) => skill.type === type && !selected.has(Number(skill.id)) && (!term || skill.name.toLocaleLowerCase().includes(term))).slice(0, 8);
+    return availableSkills.value.filter((skill) => skill.type === type && !selected.has(Number(skill.id)) && (!term || skill.name.toLocaleLowerCase().includes(term)));
 }
 const hardSkillSuggestions = computed(() => skillSuggestions('hard', hardSkillQuery.value));
 const softSkillSuggestions = computed(() => skillSuggestions('soft', softSkillQuery.value));
@@ -99,6 +108,13 @@ function removeSkill(type, id) {
     const target = type === 'hard' ? draft.hard_skill_ids : draft.soft_skill_ids;
     const index = target.indexOf(Number(id));
     if (index !== -1) target.splice(index, 1);
+}
+function closeSkillPicker(type) {
+    setTimeout(() => {
+        if (type === 'hard') hardSkillPickerOpen.value = false;
+        else if (type === 'soft') softSkillPickerOpen.value = false;
+        else languagePickerOpen.value = false;
+    }, 120);
 }
 async function createSkill(type) {
     const name = (type === 'hard' ? hardSkillQuery.value : softSkillQuery.value).trim();
@@ -115,7 +131,18 @@ async function createSkill(type) {
         skillCreateError.value[type] = exception.response?.data?.errors?.name?.[0] ?? exception.response?.data?.message ?? 'Could not add this skill. Please try again.';
     } finally { skillCreating.value[type] = false; }
 }
-const languagesForCompleteness = computed(() => draft.languages_text.split(/[\n,]+/).map((value) => value.trim()).filter(Boolean));
+const languagesForCompleteness = computed(() => draft.language_values);
+const selectableLanguages = computed(() => [...new Set([...languageOptions, ...draft.language_values])].sort((a, b) => a.localeCompare(b)));
+const languageSuggestions = computed(() => {
+    const selected = new Set(draft.language_values.map((language) => language.toLocaleLowerCase()));
+    const query = languageQuery.value.trim().toLocaleLowerCase();
+    return selectableLanguages.value.filter((language) => !selected.has(language.toLocaleLowerCase()) && (!query || language.toLocaleLowerCase().includes(query))).slice(0, 10);
+});
+function toggleLanguage(language) {
+    const index = draft.language_values.findIndex((value) => value.toLocaleLowerCase() === language.toLocaleLowerCase());
+    if (index === -1) draft.language_values.push(language);
+    else draft.language_values.splice(index, 1);
+}
 const completenessItems = computed(() => [
     { label: 'Name and email', done: Boolean(draft.name && draft.email), points: 8 },
     { label: 'Phone number', done: Boolean(draft.phone), points: 4 },
@@ -167,7 +194,7 @@ function buildFormData() {
     const data = new FormData();
     const scalarFields = [
         'name', 'email', 'password', 'password_confirmation', 'phone', 'region_id', 'township_id',
-        'professional_title', 'years_experience', 'bio', 'portfolio_url', 'skills_text', 'languages_text',
+        'professional_title', 'years_experience', 'bio', 'portfolio_url', 'skills_text',
         'desired_job_title', 'employment_type', 'work_mode', 'availability', 'expected_salary_min', 'expected_salary_max',
     ];
     data.append('_method', 'PATCH');
@@ -175,6 +202,7 @@ function buildFormData() {
     scalarFields.forEach((field) => {
         if (draft[field] !== '' && draft[field] !== null && draft[field] !== undefined) data.append(field, draft[field]);
     });
+    data.append('languages_text', draft.language_values.join(', '));
     draft.hard_skill_ids.forEach((id) => data.append('hard_skill_ids[]', String(id)));
     draft.soft_skill_ids.forEach((id) => data.append('soft_skill_ids[]', String(id)));
     data.append('job_alerts_enabled', draft.job_alerts_enabled ? '1' : '0');
@@ -216,7 +244,7 @@ function updateProfileFromResponse(updated) {
         skills_text: (profile.skills ?? []).join(', '),
         hard_skill_ids: (profile.hard_skills ?? []).map((skill) => Number(skill.id)),
         soft_skill_ids: (profile.soft_skills ?? []).map((skill) => Number(skill.id)),
-        languages_text: (profile.languages ?? []).join(', '),
+        language_values: [...(profile.languages ?? [])],
         desired_job_title: profile.desired_job_title ?? '',
         employment_type: profile.employment_type ?? '',
         work_mode: profile.work_mode ?? '',
@@ -337,9 +365,46 @@ async function submitEmployerReview(application) {
                             <div class="mt-4 grid gap-4 sm:grid-cols-2">
                                 <label class="form-label">Summary<textarea v-model="draft.bio" name="bio" rows="5" maxlength="5000" placeholder="Summarise your experience, strengths, and career goals." class="form-field" :aria-invalid="Boolean(fieldError('bio'))" @input="clearError('bio')"/><span v-if="fieldError('bio')" class="field-error" data-field-error>{{ fieldError('bio') }}</span></label>
                                 <div class="space-y-4">
-                                    <fieldset class="space-y-2"><legend class="form-label">Hard skills <span class="font-normal text-slate-500">(technical or job-specific abilities)</span></legend><div class="flex flex-wrap gap-2"><span v-for="id in draft.hard_skill_ids" :key="`hard-${id}`" class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-900">{{ availableSkills.find((skill) => Number(skill.id) === id)?.name }}<button type="button" class="rounded-full p-0.5 hover:bg-blue-100" :aria-label="`Remove ${availableSkills.find((skill) => Number(skill.id) === id)?.name}`" @click="removeSkill('hard', id)"><i class="ti ti-x" aria-hidden="true" /></button></span><span v-if="!draft.hard_skill_ids.length" class="text-sm text-slate-500">No hard skills added yet.</span></div><input v-model="hardSkillQuery" type="search" maxlength="100" placeholder="Search hard skills" class="form-field" autocomplete="off"><div v-if="hardSkillSuggestions.length" class="flex flex-wrap gap-2"><button v-for="skill in hardSkillSuggestions" :key="skill.id" type="button" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:bg-blue-50" @click="addSkill(skill)">+ {{ skill.name }}</button></div><button v-if="hardSkillQuery.trim() && !hardSkillSuggestions.some((skill) => skill.name.toLocaleLowerCase() === hardSkillQuery.trim().toLocaleLowerCase())" type="button" :disabled="skillCreating.hard" class="text-sm font-semibold text-blue-800 hover:underline disabled:opacity-50" @click="createSkill('hard')">{{ skillCreating.hard ? 'Adding…' : `Add “${hardSkillQuery.trim()}” to my skills` }}</button><p v-if="skillCreateError.hard" class="field-error" role="alert">{{ skillCreateError.hard }}</p><span v-if="fieldError('hard_skill_ids.0')" class="field-error" data-field-error>{{ fieldError('hard_skill_ids.0') }}</span></fieldset>
-                                    <fieldset class="space-y-2"><legend class="form-label">Soft skills <span class="font-normal text-slate-500">(communication, teamwork, and other interpersonal strengths)</span></legend><div class="flex flex-wrap gap-2"><span v-for="id in draft.soft_skill_ids" :key="`soft-${id}`" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-900">{{ availableSkills.find((skill) => Number(skill.id) === id)?.name }}<button type="button" class="rounded-full p-0.5 hover:bg-emerald-100" :aria-label="`Remove ${availableSkills.find((skill) => Number(skill.id) === id)?.name}`" @click="removeSkill('soft', id)"><i class="ti ti-x" aria-hidden="true" /></button></span><span v-if="!draft.soft_skill_ids.length" class="text-sm text-slate-500">No soft skills added yet.</span></div><input v-model="softSkillQuery" type="search" maxlength="100" placeholder="Search soft skills" class="form-field" autocomplete="off"><div v-if="softSkillSuggestions.length" class="flex flex-wrap gap-2"><button v-for="skill in softSkillSuggestions" :key="skill.id" type="button" class="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-emerald-300 hover:bg-emerald-50" @click="addSkill(skill)">+ {{ skill.name }}</button></div><button v-if="softSkillQuery.trim() && !softSkillSuggestions.some((skill) => skill.name.toLocaleLowerCase() === softSkillQuery.trim().toLocaleLowerCase())" type="button" :disabled="skillCreating.soft" class="text-sm font-semibold text-emerald-800 hover:underline disabled:opacity-50" @click="createSkill('soft')">{{ skillCreating.soft ? 'Adding…' : `Add “${softSkillQuery.trim()}” to my skills` }}</button><p v-if="skillCreateError.soft" class="field-error" role="alert">{{ skillCreateError.soft }}</p><span v-if="fieldError('soft_skill_ids.0')" class="field-error" data-field-error>{{ fieldError('soft_skill_ids.0') }}</span></fieldset>
-                                    <label class="form-label">Languages <span class="font-normal text-slate-500">(separate with commas)</span><textarea v-model="draft.languages_text" name="languages_text" rows="2" maxlength="1000" placeholder="Burmese, English" class="form-field" :aria-invalid="Boolean(fieldError('languages_text'))" @input="clearError('languages_text')"/><span v-if="fieldError('languages_text')" class="field-error" data-field-error>{{ fieldError('languages_text') }}</span></label>
+                                    <fieldset class="space-y-2">
+                                        <legend class="form-label">Hard skills <span class="font-normal text-slate-500">(technical or job-specific abilities)</span></legend>
+                                        <div class="flex flex-wrap gap-2"><span v-for="id in draft.hard_skill_ids" :key="`hard-${id}`" class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-900">{{ availableSkills.find((skill) => Number(skill.id) === id)?.name }}<button type="button" class="rounded-full p-0.5 hover:bg-blue-100" :aria-label="`Remove ${availableSkills.find((skill) => Number(skill.id) === id)?.name}`" @click="removeSkill('hard', id)"><i class="ti ti-x" aria-hidden="true" /></button></span><span v-if="!draft.hard_skill_ids.length" class="text-sm text-slate-500">No hard skills added yet.</span></div>
+                                        <div class="relative flow-root">
+                                            <input v-model="hardSkillQuery" type="search" maxlength="100" placeholder="Search hard skills" class="form-field" autocomplete="off" aria-label="Search hard skills to select" @focus="hardSkillPickerOpen = true" @blur="closeSkillPicker('hard')" @keydown.esc="hardSkillPickerOpen = false">
+                                            <div v-if="hardSkillPickerOpen" class="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5" role="listbox" aria-label="Hard skill options">
+                                                <p class="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Select one or more hard skills</p>
+                                                <div class="max-h-56 overflow-y-auto overscroll-contain p-1.5">
+                                                    <button v-for="skill in hardSkillSuggestions" :key="skill.id" type="button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-900 focus:bg-blue-50 focus:outline-none" role="option" aria-selected="false" @mousedown.prevent="addSkill(skill)"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"><i class="ti ti-plus" aria-hidden="true" /></span><span class="min-w-0 flex-1">{{ skill.name }}</span><span class="text-xs font-medium text-slate-400">Add</span></button>
+                                                    <p v-if="!hardSkillSuggestions.length && !(hardSkillQuery.trim() && !availableSkills.some((skill) => skill.type === 'hard' && skill.name.toLocaleLowerCase() === hardSkillQuery.trim().toLocaleLowerCase()))" class="px-3 py-3 text-sm text-slate-500">No matching hard skills.</p>
+                                                    <button v-if="hardSkillQuery.trim() && !availableSkills.some((skill) => skill.type === 'hard' && skill.name.toLocaleLowerCase() === hardSkillQuery.trim().toLocaleLowerCase())" type="button" :disabled="skillCreating.hard" class="flex w-full items-center gap-3 rounded-lg border-t border-slate-100 px-3 py-2.5 text-left text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:opacity-50" @mousedown.prevent="createSkill('hard')"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-blue-100"><i class="ti ti-plus" aria-hidden="true" /></span>{{ skillCreating.hard ? 'Adding…' : `Add “${hardSkillQuery.trim()}” to my skills` }}</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p v-if="skillCreateError.hard" class="field-error" role="alert">{{ skillCreateError.hard }}</p><span v-if="fieldError('hard_skill_ids.0')" class="field-error" data-field-error>{{ fieldError('hard_skill_ids.0') }}</span>
+                                    </fieldset>
+                                    <fieldset class="space-y-2">
+                                        <legend class="form-label">Soft skills <span class="font-normal text-slate-500">(communication, teamwork, and other interpersonal strengths)</span></legend>
+                                        <div class="flex flex-wrap gap-2"><span v-for="id in draft.soft_skill_ids" :key="`soft-${id}`" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-900">{{ availableSkills.find((skill) => Number(skill.id) === id)?.name }}<button type="button" class="rounded-full p-0.5 hover:bg-emerald-100" :aria-label="`Remove ${availableSkills.find((skill) => Number(skill.id) === id)?.name}`" @click="removeSkill('soft', id)"><i class="ti ti-x" aria-hidden="true" /></button></span><span v-if="!draft.soft_skill_ids.length" class="text-sm text-slate-500">No soft skills added yet.</span></div>
+                                        <div class="relative flow-root">
+                                            <input v-model="softSkillQuery" type="search" maxlength="100" placeholder="Search soft skills" class="form-field" autocomplete="off" aria-label="Search soft skills to select" @focus="softSkillPickerOpen = true" @blur="closeSkillPicker('soft')" @keydown.esc="softSkillPickerOpen = false">
+                                            <div v-if="softSkillPickerOpen" class="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5" role="listbox" aria-label="Soft skill options">
+                                                <p class="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Select one or more soft skills</p>
+                                                <div class="max-h-56 overflow-y-auto overscroll-contain p-1.5">
+                                                    <button v-for="skill in softSkillSuggestions" :key="skill.id" type="button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-emerald-50 hover:text-emerald-900 focus:bg-emerald-50 focus:outline-none" role="option" aria-selected="false" @mousedown.prevent="addSkill(skill)"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-emerald-50 text-emerald-700"><i class="ti ti-plus" aria-hidden="true" /></span><span class="min-w-0 flex-1">{{ skill.name }}</span><span class="text-xs font-medium text-slate-400">Add</span></button>
+                                                    <p v-if="!softSkillSuggestions.length && !(softSkillQuery.trim() && !availableSkills.some((skill) => skill.type === 'soft' && skill.name.toLocaleLowerCase() === softSkillQuery.trim().toLocaleLowerCase()))" class="px-3 py-3 text-sm text-slate-500">No matching soft skills.</p>
+                                                    <button v-if="softSkillQuery.trim() && !availableSkills.some((skill) => skill.type === 'soft' && skill.name.toLocaleLowerCase() === softSkillQuery.trim().toLocaleLowerCase())" type="button" :disabled="skillCreating.soft" class="flex w-full items-center gap-3 rounded-lg border-t border-slate-100 px-3 py-2.5 text-left text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50" @mousedown.prevent="createSkill('soft')"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-emerald-100"><i class="ti ti-plus" aria-hidden="true" /></span>{{ skillCreating.soft ? 'Adding…' : `Add “${softSkillQuery.trim()}” to my skills` }}</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p v-if="skillCreateError.soft" class="field-error" role="alert">{{ skillCreateError.soft }}</p><span v-if="fieldError('soft_skill_ids.0')" class="field-error" data-field-error>{{ fieldError('soft_skill_ids.0') }}</span>
+                                    </fieldset>
+                                    <fieldset class="relative space-y-2">
+                                        <legend class="form-label">Languages</legend>
+                                        <div class="flex flex-wrap gap-2"><span v-for="language in draft.language_values" :key="language" class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-sm font-medium text-violet-900">{{ language }}<button type="button" class="rounded-full p-0.5 hover:bg-violet-100" :aria-label="`Remove ${language}`" @click="toggleLanguage(language)"><i class="ti ti-x" aria-hidden="true" /></button></span><span v-if="!draft.language_values.length" class="text-sm text-slate-500">No languages selected yet.</span></div>
+                                        <div class="relative flow-root"><input v-model="languageQuery" type="search" maxlength="80" placeholder="Search languages" class="form-field" autocomplete="off" aria-label="Search languages to select" @focus="languagePickerOpen = true" @blur="closeSkillPicker('language')" @keydown.esc="languagePickerOpen = false">
+                                            <div v-if="languagePickerOpen" class="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5" role="listbox" aria-label="Language options"><p class="border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Select one or more languages</p><div class="max-h-56 overflow-y-auto overscroll-contain p-1.5"><button v-for="language in languageSuggestions" :key="language" type="button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-900 focus:bg-violet-50 focus:outline-none" role="option" aria-selected="false" @mousedown.prevent="toggleLanguage(language)"><span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-violet-50 text-violet-700"><i class="ti ti-language" aria-hidden="true" /></span><span class="min-w-0 flex-1">{{ language }}</span><span class="text-xs font-medium text-slate-400">Add</span></button><p v-if="!languageSuggestions.length" class="px-3 py-3 text-sm text-slate-500">No matching languages.</p></div></div>
+                                        </div>
+                                        <span v-if="fieldError('languages_text')" class="field-error" data-field-error>{{ fieldError('languages_text') }}</span>
+                                    </fieldset>
                                 </div>
                             </div>
                         </section>
