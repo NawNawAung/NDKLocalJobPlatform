@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BillingProduct;
 use App\Models\AdCampaign;
+use App\Models\BillingProduct;
 use App\Models\Employer;
 use App\Models\Invoice;
 use App\Models\Job;
@@ -84,8 +84,23 @@ class BillingController extends Controller
                     'slug' => $product->slug, 'name' => $product->name, 'description' => $product->description,
                     'product_type' => $product->product_type, 'price_amount' => $product->price_amount,
                     'currency' => $product->currency, 'duration_days' => $product->duration_days,
+                    'slots' => $product->product_type === 'job_promotion' ? (int) data_get($product->metadata, 'slots', 1) : null,
+                    'package_validity_days' => $product->product_type === 'job_promotion' ? (int) data_get($product->metadata, 'package_validity_days', 90) : null,
                 ]),
             'jobs' => $employer->jobs()->where('status', 'published')->orderBy('title')->get(['id', 'title']),
+            'featured_packages' => $employer->featuredJobPackages()->with(['orderItem', 'promotions.job:id,title'])
+                ->latest('purchased_at')->get()->map(fn ($package) => [
+                    'id' => $package->id, 'slots_total' => $package->slots_total,
+                    'slots_remaining' => $package->slots_remaining, 'slots_used' => $package->slots_used,
+                    'promotion_duration_days' => $package->promotion_duration_days,
+                    'purchased_at' => $package->purchased_at?->toIso8601String(),
+                    'expires_at' => $package->expires_at?->toIso8601String(),
+                    'expired' => $package->expires_at->isPast(),
+                    'promotions' => $package->promotions->map(fn (JobPromotion $promotion) => [
+                        'job_title' => $promotion->job?->title, 'status' => $promotion->status,
+                        'starts_at' => $promotion->starts_at?->toIso8601String(), 'ends_at' => $promotion->ends_at?->toIso8601String(),
+                    ]),
+                ]),
             'orders' => $employer->orders()->with(['items', 'payments.refunds', 'invoice'])->latest()->limit(20)->get()
                 ->map(fn (Order $order) => [
                     'id' => $order->id, 'order_number' => $order->order_number, 'status' => $order->status,
@@ -136,8 +151,11 @@ class BillingController extends Controller
             $product = BillingProduct::query()->where('slug', $data['product_slug'])->where('is_active', true)->firstOrFail();
             abort_unless(in_array($product->product_type, ['job_promotion', 'company_promotion'], true), 422, 'This product is not available for employer checkout.');
             if ($product->product_type === 'job_promotion') {
-                $job = $employer->jobs()->whereKey($data['job_id'] ?? null)->where('status', 'published')->first();
-                abort_unless($job, 422, 'Select one of your published jobs to promote.');
+                abort_if($product->price_amount <= 0, 422, 'This featured-job package is not priced yet.');
+                if (isset($data['job_id'])) {
+                    $job = $employer->jobs()->published()->whereKey($data['job_id'])->first();
+                    abort_unless($job, 422, 'Select one of your published jobs to promote.');
+                }
                 $item = ['type' => 'job_promotion', 'name' => $product->name, 'amount' => $product->price_amount, 'product' => $product, 'job' => $job];
             } else {
                 abort_if(isset($data['job_id']), 422, 'A company promotion applies to the employer profile, not a job.');
@@ -200,6 +218,38 @@ class BillingController extends Controller
         });
 
         return response()->json(['message' => 'Order created. Submit a bank-transfer receipt for review.', 'order' => ['id' => $order->id, 'order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'currency' => $order->currency]], 201);
+    }
+
+    public function assignFeaturedPackageJob(Request $request, \App\Models\FeaturedJobPackage $package): JsonResponse
+    {
+        $employer = $this->employer($request);
+        abort_unless($package->employer_id === $employer->id, 404);
+        $data = $request->validate(['job_id' => ['required', 'integer']]);
+        $promotion = DB::transaction(function () use ($package, $employer, $data) {
+            $locked = \App\Models\FeaturedJobPackage::query()->lockForUpdate()->findOrFail($package->id);
+            abort_if($locked->expires_at->isPast(), 422, 'This featured-job package has expired.');
+            abort_if($locked->slots_remaining < 1, 422, 'This package has no featured-job slots remaining.');
+            $job = $employer->jobs()->published()->whereKey($data['job_id'])->lockForUpdate()->first();
+            abort_unless($job, 422, 'Choose one of your published jobs.');
+            $alreadyFeatured = JobPromotion::query()->where('job_id', $job->id)->where('promotion_type', 'featured')
+                ->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())->exists();
+            abort_if($alreadyFeatured, 422, 'This job already has an active featured placement.');
+
+            $promotion = JobPromotion::create([
+                'job_id' => $job->id, 'employer_id' => $employer->id,
+                'order_item_id' => $locked->order_item_id, 'promotion_type' => 'featured', 'status' => 'active',
+                'starts_at' => now(), 'ends_at' => now()->addDays($locked->promotion_duration_days),
+                'metadata' => ['package_id' => $locked->id, 'source' => 'featured_job_package'],
+            ]);
+            $locked->decrement('slots_remaining');
+
+            return $promotion;
+        });
+
+        return response()->json(['message' => 'Featured placement activated for your job.', 'promotion' => [
+            'id' => $promotion->id, 'status' => $promotion->status,
+            'starts_at' => $promotion->starts_at?->toIso8601String(), 'ends_at' => $promotion->ends_at?->toIso8601String(),
+        ]], 201);
     }
 
     public function submitPayment(Request $request, Order $order): JsonResponse
@@ -370,6 +420,19 @@ class BillingController extends Controller
                         'promotion_type' => $type, 'status' => $start->isFuture() ? 'scheduled' : 'active',
                         'starts_at' => $start, 'ends_at' => $start->copy()->addDays($duration),
                         'metadata' => ['product_name' => $item->item_name],
+                    ]);
+                } elseif ($item->item_type === 'job_promotion' && ! $item->job && $item->product && $order->employer) {
+                    abort_if($item->featuredJobPackage()->exists(), 422, 'This featured-job package has already been fulfilled.');
+                    $snapshot = $item->item_snapshot ?? [];
+                    $metadata = $snapshot['metadata'] ?? $item->product->metadata ?? [];
+                    $slots = max(1, min(100, (int) data_get($metadata, 'slots', 1)));
+                    $promotionDuration = max(1, min(90, (int) ($snapshot['duration_days'] ?? $item->product->duration_days ?? 7)));
+                    $validity = max(1, min(365, (int) data_get($metadata, 'package_validity_days', 90)));
+                    \App\Models\FeaturedJobPackage::create([
+                        'employer_id' => $order->employer_id, 'order_item_id' => $item->id,
+                        'slots_total' => $slots, 'slots_remaining' => $slots,
+                        'promotion_duration_days' => $promotionDuration, 'purchased_at' => now(),
+                        'expires_at' => now()->addDays($validity),
                     ]);
                 } elseif ($item->item_type === 'company_promotion' && $item->product && $order->employer) {
                     $productMeta = $item->product->metadata ?? [];

@@ -86,7 +86,7 @@ onMounted(() => loadProfile());
                         <article v-for="job in jobs" :key="job.id" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2"><h3 class="text-base font-bold text-slate-900">{{ job.title }}</h3><span v-if="job.is_featured" class="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900"><i class="ti ti-ad" aria-hidden="true" /> {{ $t('Sponsored') }}</span></div>
+                                    <div class="flex flex-wrap items-center gap-2"><h3 class="text-base font-bold text-slate-900">{{ job.title }}</h3><span v-if="job.is_featured" class="rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900"><i class="ti ti-star-filled" aria-hidden="true" /> {{ $t('Featured') }}</span></div>
                                     <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-600"><span>{{ job.category }}</span><span>{{ job.location }}</span><span>{{ $t(formatLabel(job.employment_type)) }}</span><span v-if="job.experience_level">{{ $t(formatLabel(job.experience_level)) }}</span><span>{{ formatSalary(job) }}</span></div>
                                 </div>
                                 <a :href="`/#details?job=${job.id}`" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ $t('View job') }}<i class="ti ti-arrow-right" aria-hidden="true" /></a>

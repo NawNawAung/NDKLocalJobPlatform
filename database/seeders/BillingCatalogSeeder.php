@@ -36,14 +36,14 @@ class BillingCatalogSeeder extends Seeder
             }
         }
 
-        BillingProduct::updateOrCreate(['slug' => 'featured-job-7-days'], [
+        BillingProduct::firstOrCreate(['slug' => 'featured-job-7-days'], [
             'name' => 'Featured job · 7 days',
             'description' => 'Feature one published job for seven days with a featured badge and elevated placement.',
             'product_type' => 'job_promotion',
             'price_amount' => 20000,
             'currency' => 'MMK',
             'duration_days' => 7,
-            'metadata' => ['promotion_type' => 'featured'],
+            'metadata' => ['promotion_type' => 'featured', 'slots' => 1, 'package_validity_days' => 90],
             'is_active' => true,
             'sort_order' => 1,
         ]);

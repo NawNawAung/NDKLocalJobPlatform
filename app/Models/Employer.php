@@ -77,6 +77,11 @@ class Employer extends Model
         return $this->hasMany(JobPromotion::class);
     }
 
+    public function featuredJobPackages(): HasMany
+    {
+        return $this->hasMany(FeaturedJobPackage::class);
+    }
+
     public function adCampaigns(): HasMany
     {
         return $this->hasMany(AdCampaign::class);

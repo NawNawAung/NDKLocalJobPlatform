@@ -7,6 +7,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\EmployerReviewController;
+use App\Http\Controllers\ExternalAdvertisementController;
 use App\Http\Controllers\EmployerWorkspaceController;
 use App\Http\Controllers\JobApplicationController;
 use App\Http\Controllers\JobCategoryController;
@@ -24,6 +25,7 @@ Route::get('/profile', [AuthController::class, 'profilePage'])->name('profile.pa
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 Route::get('/api/companies', [CompanyController::class, 'index'])->name('companies.index');
 Route::get('/api/advertisements/companies', [CompanyController::class, 'sponsoredCompanies'])->name('advertisements.companies');
+Route::get('/api/advertisements', [ExternalAdvertisementController::class, 'display'])->middleware('throttle:60,1')->name('advertisements.display');
 Route::get('/api/companies/{employer}', [CompanyController::class, 'show'])->name('companies.profile');
 Route::get('/api/salary-insights', SalaryInsightsController::class)->name('salary-insights.index');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
@@ -51,6 +53,7 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
     Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     Route::get('/employer/billing', [BillingController::class, 'overview'])->name('employer.billing');
     Route::post('/employer/billing/orders', [BillingController::class, 'createOrder'])->middleware('throttle:10,1')->name('employer.billing.orders.store');
+    Route::post('/employer/billing/featured-packages/{package}/assign', [BillingController::class, 'assignFeaturedPackageJob'])->middleware('throttle:20,1')->name('employer.billing.featured-packages.assign');
     Route::patch('/employer/billing/orders/{order}/cancel', [BillingController::class, 'cancelOrder'])->name('employer.billing.orders.cancel');
     Route::post('/employer/billing/orders/{order}/payments', [BillingController::class, 'submitPayment'])->middleware('throttle:5,1')->name('employer.billing.payments.store');
     Route::get('/billing/invoices/{invoice}', [BillingController::class, 'invoice'])->name('billing.invoices.show');
@@ -77,7 +80,12 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
         Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
         Route::get('/advertising/campaigns', [AdminAdvertisingController::class, 'index'])->name('advertising.campaigns');
         Route::patch('/advertising/campaigns/{kind}/{campaignId}', [AdminAdvertisingController::class, 'updateCampaign'])->whereNumber('campaignId')->name('advertising.campaigns.update');
-        Route::patch('/advertising/products/{product}', [AdminAdvertisingController::class, 'updateCompanyProduct'])->name('advertising.products.update');
+        Route::patch('/advertising/products/{product}', [AdminAdvertisingController::class, 'updateProduct'])->name('advertising.products.update');
+        Route::post('/advertising/job-products', [AdminAdvertisingController::class, 'createJobProduct'])->name('advertising.job-products.store');
+        Route::get('/advertising/external', [ExternalAdvertisementController::class, 'index'])->name('advertising.external.index');
+        Route::post('/advertising/external', [ExternalAdvertisementController::class, 'store'])->middleware('throttle:20,1')->name('advertising.external.store');
+        Route::patch('/advertising/external/{advertisement}', [ExternalAdvertisementController::class, 'update'])->name('advertising.external.update');
+        Route::post('/advertising/external/{advertisement}/payments', [ExternalAdvertisementController::class, 'recordPayment'])->name('advertising.external.payments.store');
     });
     Route::get('/employer/talent', [BillingController::class, 'talent'])->name('employer.talent');
     Route::get('/employer/talent/{jobSeekerId}/resume', [BillingController::class, 'downloadTalentResume'])->whereNumber('jobSeekerId')->name('employer.talent.resume');

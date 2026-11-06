@@ -33,4 +33,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Job::class);
     }
+
+    public function featuredJobPackage(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(FeaturedJobPackage::class);
+    }
 }

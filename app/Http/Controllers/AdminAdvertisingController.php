@@ -72,6 +72,14 @@ class AdminAdvertisingController extends Controller
                     'duration_days' => $product->duration_days, 'is_active' => $product->is_active,
                     'impression_limit' => data_get($product->metadata, 'impression_limit'),
                 ]),
+            'job_products' => BillingProduct::query()->where('product_type', 'job_promotion')->orderBy('sort_order')->get()
+                ->map(fn (BillingProduct $product) => [
+                    'id' => $product->id, 'name' => $product->name, 'description' => $product->description,
+                    'price_amount' => $product->price_amount, 'currency' => $product->currency,
+                    'duration_days' => $product->duration_days, 'is_active' => $product->is_active,
+                    'slots' => data_get($product->metadata, 'slots', 1),
+                    'package_validity_days' => data_get($product->metadata, 'package_validity_days', 90),
+                ]),
         ]);
     }
 
@@ -90,7 +98,7 @@ class AdminAdvertisingController extends Controller
         abort_if($data === [], 422, 'Choose a campaign status, schedule, or display limit to update.');
 
         $modelClass = $kind === 'job' ? JobPromotion::class : AdCampaign::class;
-        $result = DB::transaction(function () use ($request, $admin, $data, $kind, $campaignId, $modelClass) {
+        $result = DB::transaction(function () use ($request, $admin, $data, $campaignId, $modelClass) {
             $campaign = $modelClass::query()->lockForUpdate()->findOrFail($campaignId);
             $before = [
                 'status' => $campaign->status,
@@ -113,8 +121,12 @@ class AdminAdvertisingController extends Controller
             }
 
             $campaign->fill(array_intersect_key($data, array_flip(['status', 'impression_limit'])));
-            if (array_key_exists('starts_at', $data)) $campaign->starts_at = $start;
-            if (array_key_exists('ends_at', $data)) $campaign->ends_at = $end;
+            if (array_key_exists('starts_at', $data)) {
+                $campaign->starts_at = $start;
+            }
+            if (array_key_exists('ends_at', $data)) {
+                $campaign->ends_at = $end;
+            }
             $campaign->save();
 
             $after = [
@@ -131,23 +143,33 @@ class AdminAdvertisingController extends Controller
         return response()->json(['message' => 'Campaign updated.', 'campaign' => $result]);
     }
 
-    public function updateCompanyProduct(Request $request, BillingProduct $product): JsonResponse
+    public function updateProduct(Request $request, BillingProduct $product): JsonResponse
     {
         $admin = $this->authorizeAdmin($request);
-        abort_unless($product->product_type === 'company_promotion', 404);
+        abort_unless(in_array($product->product_type, ['company_promotion', 'job_promotion'], true), 404);
+        $isJobProduct = $product->product_type === 'job_promotion';
         $data = $request->validate([
             'price_amount' => ['sometimes', 'required', 'integer', 'min:1', 'max:100000000'],
             'duration_days' => ['sometimes', 'required', 'integer', 'min:1', 'max:90'],
             'impression_limit' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:10000000'],
+            'slots' => ['sometimes', 'required', 'integer', 'min:1', 'max:100'],
+            'package_validity_days' => ['sometimes', 'required', 'integer', 'min:1', 'max:365'],
             'is_active' => ['sometimes', 'required', 'boolean'],
         ]);
-        abort_if($data === [], 422, 'Choose a product price, duration, display limit, or availability to update.');
+        abort_if($isJobProduct && array_key_exists('impression_limit', $data), 422, 'Display limits apply to company placements only.');
+        abort_if(! $isJobProduct && (array_key_exists('slots', $data) || array_key_exists('package_validity_days', $data)), 422, 'Package slots apply to featured job products only.');
+        abort_if($data === [], 422, 'Choose product settings to update.');
         if (($data['is_active'] ?? false) || ($product->is_active && array_key_exists('is_active', $data) && $data['is_active'])) {
             abort_unless(($data['price_amount'] ?? $product->price_amount) > 0, 422, 'Set a price before making the company promotion available.');
         }
 
         $before = ['price_amount' => $product->price_amount, 'duration_days' => $product->duration_days, 'is_active' => $product->is_active, 'metadata' => $product->metadata];
-        if (array_key_exists('impression_limit', $data)) {
+        if ($isJobProduct && (array_key_exists('slots', $data) || array_key_exists('package_validity_days', $data))) {
+            $product->metadata = [...($product->metadata ?? []), 'promotion_type' => 'featured',
+                'slots' => $data['slots'] ?? data_get($product->metadata, 'slots', 1),
+                'package_validity_days' => $data['package_validity_days'] ?? data_get($product->metadata, 'package_validity_days', 90)];
+        }
+        if (! $isJobProduct && array_key_exists('impression_limit', $data)) {
             $product->metadata = [...($product->metadata ?? []), 'placement' => AdCampaign::COMPANY_SPOTLIGHT, 'impression_limit' => $data['impression_limit']];
         }
         $product->fill(array_intersect_key($data, array_flip(['price_amount', 'duration_days', 'is_active'])));
@@ -156,5 +178,31 @@ class AdminAdvertisingController extends Controller
         $this->audit->record($request, $admin, 'advertising.product.updated', $product, $before, $after);
 
         return response()->json(['message' => 'Company advertising product updated.']);
+    }
+
+    public function createJobProduct(Request $request): JsonResponse
+    {
+        $admin = $this->authorizeAdmin($request);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:160'],
+            'slug' => ['required', 'string', 'max:120', 'alpha_dash', 'unique:billing_products,slug'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'price_amount' => ['required', 'integer', 'min:1', 'max:100000000'],
+            'duration_days' => ['required', 'integer', 'min:1', 'max:90'],
+            'slots' => ['required', 'integer', 'min:1', 'max:100'],
+            'package_validity_days' => ['required', 'integer', 'min:1', 'max:365'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+        $product = BillingProduct::create([
+            'name' => $data['name'], 'slug' => $data['slug'], 'description' => $data['description'] ?? null,
+            'product_type' => 'job_promotion', 'price_amount' => $data['price_amount'], 'currency' => 'MMK',
+            'duration_days' => $data['duration_days'], 'metadata' => [
+                'promotion_type' => 'featured', 'slots' => $data['slots'],
+                'package_validity_days' => $data['package_validity_days'],
+            ], 'is_active' => $data['is_active'], 'sort_order' => (int) BillingProduct::query()->where('product_type', 'job_promotion')->max('sort_order') + 1,
+        ]);
+        $this->audit->record($request, $admin, 'featured_job.product.created', $product, [], $product->only(['name', 'slug', 'price_amount', 'duration_days', 'metadata', 'is_active']));
+
+        return response()->json(['message' => 'Featured-job package created.', 'product' => $product], 201);
     }
 }

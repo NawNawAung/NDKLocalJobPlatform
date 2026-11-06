@@ -28,6 +28,7 @@ class JobSearchController extends Controller
             'date_posted' => ['nullable', Rule::in(['24h', '7d', '30d'])],
             'sort' => ['nullable', Rule::in(['latest', 'salary_high', 'salary_low'])],
             'page' => ['nullable', 'integer', 'min:1'],
+            'featured' => ['nullable', 'boolean'],
         ]);
 
         $employer = $request->user()?->role === 'employer' ? $request->user()->employer : null;
@@ -38,6 +39,7 @@ class JobSearchController extends Controller
             ->when($employer, fn (Builder $query) => $query->where('employer_id', '!=', $employer->id))
             ->with(['employer.user', 'township.region', 'promotions' => fn ($query) => $query->whereIn('status', ['active', 'scheduled'])->where('starts_at', '<=', now())->where('ends_at', '>', now())])
             ->withCount(['promotions as active_featured_promotions_count' => fn ($query) => $query->where('promotion_type', 'featured')->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now())])
+            ->when(($filters['featured'] ?? false), fn (Builder $query) => $query->whereHas('promotions', fn (Builder $promotion) => $promotion->where('promotion_type', 'featured')->where('status', 'active')->where('starts_at', '<=', now())->where('ends_at', '>', now())))
             ->when($filters['keyword'] ?? null, function (Builder $query, string $keyword) {
                 $query->where(function (Builder $match) use ($keyword) {
                     $match->where('title', 'like', "%{$keyword}%")

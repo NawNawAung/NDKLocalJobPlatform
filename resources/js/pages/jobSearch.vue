@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import ExternalAdvertisementBanner from '../components/ExternalAdvertisementBanner.vue';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const regions = bootstrap.regions ?? [];
@@ -144,6 +145,8 @@ onMounted(async () => {
                 <p class="mt-2 text-sm text-slate-600">{{ isEmployer ? $t('Review current listings from other organizations and compare role requirements, locations, and salary ranges.') : $t('Use the filters to narrow the results to the work you want.') }}</p>
             </div>
 
+            <ExternalAdvertisementBanner placement="job_search_banner" />
+
             <div class="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <aside class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="mb-5 flex items-center justify-between">
@@ -233,7 +236,7 @@ onMounted(async () => {
                                     <a :href="`/companies/${job.company_id}`" class="inline-block text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)] hover:underline">{{ job.company }}</a>
                                     <p v-if="job.company_rating" class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><i class="ti ti-star-filled" aria-hidden="true"/>{{ Number(job.company_rating).toFixed(1) }} <span class="font-normal text-slate-500">({{ job.company_review_count }} {{ $t('reviews') }})</span></p>
                                     <h2 class="mt-1 text-lg font-bold text-[var(--brand-ink)]">{{ job.title }}</h2>
-                                    <span v-if="job.is_featured" class="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-900"><i class="ti ti-ad" aria-hidden="true"/>{{ $t('Sponsored') }}</span>
+                                    <span v-if="job.is_featured" class="mt-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-900"><i class="ti ti-star-filled" aria-hidden="true"/>{{ $t('Featured') }}</span>
                                     <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
                                         <span>{{ job.location }}</span><span aria-hidden="true">·</span><span>{{ formatLabel(job.employment_type) }}</span><span v-if="job.work_mode" aria-hidden="true">·</span><span v-if="job.work_mode">{{ formatLabel(job.work_mode) }}</span>
                                     </p>
