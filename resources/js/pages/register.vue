@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { t } from '../i18n.js';
+import { locale, setLocale, t } from '../i18n.js';
 
 const props = defineProps({ bootstrap: { type: Object, default: () => window.__AUTH_BOOTSTRAP__ ?? {} } });
 const old = props.bootstrap.old ?? {};
@@ -21,13 +21,17 @@ watch(regionId, () => { townshipId.value = ''; });
 function errorFor(field) { return props.bootstrap.errors?.[field]?.[0] ?? ''; }
 function regionLabel(region) {
     const suffix = t(region.type === 'state' ? 'State' : region.type === 'union_territory' ? 'Union Territory' : 'Region');
-    return `${region.name} ${suffix}`;
+    return `${t(region.name)} ${suffix}`;
 }
 </script>
 
 <template>
     <section class="px-5 py-10 sm:px-8 sm:py-14">
         <div class="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
+            <div class="mb-5 flex justify-end" role="group" :aria-label="$t('Choose language')">
+                <button type="button" class="rounded-l-lg border px-3 py-1.5 text-xs font-semibold transition" :class="locale === 'en' ? 'border-blue-700 bg-blue-50 text-blue-900' : 'border-slate-300 text-slate-600 hover:bg-slate-50'" :aria-pressed="locale === 'en'" @click="setLocale('en')">English</button>
+                <button type="button" class="rounded-r-lg border-y border-r px-3 py-1.5 text-xs font-semibold transition" :class="locale === 'my' ? 'border-blue-700 bg-blue-50 text-blue-900' : 'border-slate-300 text-slate-600 hover:bg-slate-50'" :aria-pressed="locale === 'my'" @click="setLocale('my')">မြန်မာ</button>
+            </div>
             <div class="mb-8 text-center">
                 <a href="/" class="mb-4 inline-flex items-center justify-center" aria-label="NDK Job Platform home">
                     <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform logo" class="block h-20 w-20 object-contain sm:h-24 sm:w-24" />
@@ -50,19 +54,19 @@ function regionLabel(region) {
                             <span><span class="block text-sm font-semibold text-slate-900">{{ $t('I’m hiring') }}</span><span class="mt-1 block text-xs leading-5 text-slate-600">{{ $t('Create an employer account.') }}</span></span>
                         </label>
                     </div>
-                    <p v-if="errorFor('role')" class="field-error">{{ errorFor('role') }}</p>
+                    <p v-if="errorFor('role')" class="field-error">{{ $t(errorFor('role')) }}</p>
                 </fieldset>
 
                 <div class="sm:col-span-2 border-b border-slate-200 pb-2"><h2 class="text-lg font-semibold text-slate-900">{{ $t('Account details') }}</h2></div>
                 <div>
                     <label for="register-name" class="form-label">{{ $t('Full name') }}</label>
-                    <input id="register-name" v-model="name" name="name" type="text" autocomplete="name" required maxlength="255" class="form-field" placeholder="Your full name">
-                    <p v-if="errorFor('name')" class="field-error">{{ errorFor('name') }}</p>
+                    <input id="register-name" v-model="name" name="name" type="text" autocomplete="name" required maxlength="255" class="form-field" :placeholder="$t('Your full name')">
+                    <p v-if="errorFor('name')" class="field-error">{{ $t(errorFor('name')) }}</p>
                 </div>
                 <div>
                     <label for="register-email" class="form-label">{{ $t('Email address') }}</label>
-                    <input id="register-email" v-model="email" name="email" type="email" autocomplete="email" required maxlength="255" class="form-field" placeholder="you@example.com">
-                    <p v-if="errorFor('email')" class="field-error">{{ errorFor('email') }}</p>
+                    <input id="register-email" v-model="email" name="email" type="email" autocomplete="email" required maxlength="255" class="form-field" :placeholder="$t('you@example.com')">
+                    <p v-if="errorFor('email')" class="field-error">{{ $t(errorFor('email')) }}</p>
                 </div>
 
                 <template v-if="role === 'job_seeker'">
@@ -73,7 +77,7 @@ function regionLabel(region) {
                             <option value="">{{ $t('Choose a region or state') }}</option>
                             <option v-for="region in regions" :key="region.id" :value="String(region.id)">{{ regionLabel(region) }}</option>
                         </select>
-                        <p v-if="errorFor('region_id')" class="field-error">{{ errorFor('region_id') }}</p>
+                        <p v-if="errorFor('region_id')" class="field-error">{{ $t(errorFor('region_id')) }}</p>
                     </div>
                 </template>
 
@@ -81,38 +85,38 @@ function regionLabel(region) {
                     <div class="sm:col-span-2 border-b border-slate-200 pb-2 pt-2"><h2 class="text-lg font-semibold text-slate-900">{{ $t('Company details') }}</h2></div>
                     <div>
                         <label for="company-name" class="form-label">{{ $t('Company name') }}</label>
-                        <input id="company-name" v-model="companyName" name="company_name" type="text" autocomplete="organization" maxlength="255" required class="form-field" placeholder="Your organization">
-                        <p v-if="errorFor('company_name')" class="field-error">{{ errorFor('company_name') }}</p>
+                        <input id="company-name" v-model="companyName" name="company_name" type="text" autocomplete="organization" maxlength="255" required class="form-field" :placeholder="$t('Your organization')">
+                        <p v-if="errorFor('company_name')" class="field-error">{{ $t(errorFor('company_name')) }}</p>
                     </div>
                     <div>
                         <label for="company-location" class="form-label">{{ $t('Company address') }} <span class="font-normal text-slate-500">{{ $t('(optional)') }}</span></label>
-                        <input id="company-location" v-model="companyLocation" name="location" type="text" maxlength="255" class="form-field" placeholder="Office address or area">
+                        <input id="company-location" v-model="companyLocation" name="location" type="text" maxlength="255" class="form-field" :placeholder="$t('Office address or area')">
                     </div>
                     <div class="sm:col-span-2">
                         <label for="company-description" class="form-label">{{ $t('About the company') }} <span class="font-normal text-slate-500">{{ $t('(optional)') }}</span></label>
-                        <textarea id="company-description" v-model="companyDescription" name="company_description" rows="3" maxlength="5000" class="form-field" placeholder="A short introduction to your organization"></textarea>
+                        <textarea id="company-description" v-model="companyDescription" name="company_description" rows="3" maxlength="5000" class="form-field" :placeholder="$t('A short introduction to your organization')"></textarea>
                     </div>
                     <div>
                         <label for="company-region" class="form-label">{{ $t('Company region or state') }}</label>
                         <select id="company-region" v-model="regionId" name="region_id" required class="form-field"><option value="">{{ $t('Choose a region or state') }}</option><option v-for="region in regions" :key="region.id" :value="String(region.id)">{{ regionLabel(region) }}</option></select>
-                        <p v-if="errorFor('region_id')" class="field-error">{{ errorFor('region_id') }}</p>
+                        <p v-if="errorFor('region_id')" class="field-error">{{ $t(errorFor('region_id')) }}</p>
                     </div>
                     <div>
                         <label for="company-township" class="form-label">{{ $t('Township') }} <span class="font-normal text-slate-500">{{ $t('(optional)') }}</span></label>
                         <select id="company-township" v-model="townshipId" name="township_id" :disabled="!regionId || townships.length === 0" class="form-field disabled:bg-slate-50"><option value="">{{ $t('Choose a township') }}</option><option v-for="township in townships" :key="township.id" :value="String(township.id)">{{ township.name }}</option></select>
-                        <p v-if="errorFor('township_id')" class="field-error">{{ errorFor('township_id') }}</p>
+                        <p v-if="errorFor('township_id')" class="field-error">{{ $t(errorFor('township_id')) }}</p>
                     </div>
                 </div>
 
                 <div class="sm:col-span-2 border-b border-slate-200 pb-2 pt-2"><h2 class="text-lg font-semibold text-slate-900">{{ $t('Password') }}</h2></div>
                 <div>
                     <label for="register-password" class="form-label">{{ $t('Password') }}</label>
-                    <input id="register-password" v-model="password" name="password" type="password" autocomplete="new-password" required minlength="8" class="form-field" placeholder="At least 8 characters">
-                    <p v-if="errorFor('password')" class="field-error">{{ errorFor('password') }}</p>
+                    <input id="register-password" v-model="password" name="password" type="password" autocomplete="new-password" required minlength="8" class="form-field" :placeholder="$t('At least 8 characters')">
+                    <p v-if="errorFor('password')" class="field-error">{{ $t(errorFor('password')) }}</p>
                 </div>
                 <div>
                     <label for="register-password-confirmation" class="form-label">{{ $t('Confirm password') }}</label>
-                    <input id="register-password-confirmation" v-model="passwordConfirmation" name="password_confirmation" type="password" autocomplete="new-password" required minlength="8" class="form-field" placeholder="Enter the password again">
+                    <input id="register-password-confirmation" v-model="passwordConfirmation" name="password_confirmation" type="password" autocomplete="new-password" required minlength="8" class="form-field" :placeholder="$t('Enter the password again')">
                 </div>
                 <div class="sm:col-span-2">
                     <button type="submit" class="w-full rounded-lg bg-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] focus:outline-none focus:ring-4 focus:ring-blue-200">{{ $t('Create account') }}</button>

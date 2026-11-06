@@ -1,4 +1,6 @@
 <script setup>
+import { locale, setLocale } from '../i18n.js';
+
 const props = defineProps({ bootstrap: { type: Object, default: () => window.__AUTH_BOOTSTRAP__ ?? {} } });
 
 function errorFor(field) {
@@ -11,14 +13,18 @@ function errorFor(field) {
         <div class="mx-auto grid max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[0.9fr_1.1fr]">
             <div class="hidden flex-col justify-between bg-[var(--brand-ink)] p-10 text-white lg:flex">
                 <div>
-                    <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-blue-100">{{ bootstrap.adminLogin ? $t('PLATFORM ADMINISTRATION') : 'NDK JOB PLATFORM' }}</span>
+                    <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-blue-100">{{ bootstrap.adminLogin ? $t('PLATFORM ADMINISTRATION') : $t('NDK JOB PLATFORM') }}</span>
                     <h1 class="mt-8 text-3xl font-bold leading-tight">{{ bootstrap.adminLogin ? $t('Manage the platform with confidence.') : $t('Find work that moves you forward.') }}</h1>
                     <p class="mt-4 max-w-sm text-sm leading-6 text-blue-100/80">{{ bootstrap.adminLogin ? $t('Secure access for designated administrators to review platform activity and marketplace operations.') : $t('Sign in to explore opportunities, manage applications, and connect with employers across Myanmar.') }}</p>
                 </div>
-                <p class="text-sm text-blue-100/70">{{ bootstrap.adminLogin ? 'Administrative access is protected and audited.' : 'Local opportunities. Meaningful careers.' }}</p>
+                <p class="text-sm text-blue-100/70">{{ bootstrap.adminLogin ? $t('Administrative access is protected and audited.') : $t('Local opportunities. Meaningful careers.') }}</p>
             </div>
 
             <div class="p-6 sm:p-10 lg:p-12">
+                <div class="mb-4 flex justify-end" role="group" :aria-label="$t('Choose language')">
+                    <button type="button" class="rounded-l-lg border px-3 py-1.5 text-xs font-semibold transition" :class="locale === 'en' ? 'border-blue-700 bg-blue-50 text-blue-900' : 'border-slate-300 text-slate-600 hover:bg-slate-50'" :aria-pressed="locale === 'en'" @click="setLocale('en')">English</button>
+                    <button type="button" class="rounded-r-lg border-y border-r px-3 py-1.5 text-xs font-semibold transition" :class="locale === 'my' ? 'border-blue-700 bg-blue-50 text-blue-900' : 'border-slate-300 text-slate-600 hover:bg-slate-50'" :aria-pressed="locale === 'my'" @click="setLocale('my')">မြန်မာ</button>
+                </div>
                 <a href="/" class="mb-5 flex justify-center" aria-label="NDK Job Platform home">
                     <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform logo" class="block h-20 w-20 object-contain sm:h-24 sm:w-24" />
                 </a>
@@ -30,14 +36,14 @@ function errorFor(field) {
 
                     <div>
                         <label for="login-email" class="mb-1.5 block text-sm font-semibold text-slate-700">{{ $t('Email address') }}</label>
-                        <input id="login-email" name="email" type="email" autocomplete="email" required autofocus :value="bootstrap.old?.email ?? ''" :aria-invalid="Boolean(errorFor('email'))" class="w-full rounded-lg border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" placeholder="you@example.com">
-                        <p v-if="errorFor('email')" class="mt-1.5 text-sm text-red-700" role="alert">{{ errorFor('email') }}</p>
+                        <input id="login-email" name="email" type="email" autocomplete="email" required autofocus :value="bootstrap.old?.email ?? ''" :aria-invalid="Boolean(errorFor('email'))" class="w-full rounded-lg border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" :placeholder="$t('you@example.com')">
+                        <p v-if="errorFor('email')" class="mt-1.5 text-sm text-red-700" role="alert">{{ $t(errorFor('email')) }}</p>
                     </div>
 
                     <div>
                         <label for="login-password" class="mb-1.5 block text-sm font-semibold text-slate-700">{{ $t('Password') }}</label>
-                        <input id="login-password" name="password" type="password" autocomplete="current-password" required :aria-invalid="Boolean(errorFor('password'))" class="w-full rounded-lg border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" placeholder="Enter your password">
-                        <p v-if="errorFor('password')" class="mt-1.5 text-sm text-red-700" role="alert">{{ errorFor('password') }}</p>
+                        <input id="login-password" name="password" type="password" autocomplete="current-password" required :aria-invalid="Boolean(errorFor('password'))" class="w-full rounded-lg border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100" :placeholder="$t('Enter your password')">
+                        <p v-if="errorFor('password')" class="mt-1.5 text-sm text-red-700" role="alert">{{ $t(errorFor('password')) }}</p>
                     </div>
 
                     <button type="submit" class="w-full rounded-lg bg-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] focus:outline-none focus:ring-4 focus:ring-blue-200">{{ $t('Sign in') }}</button>

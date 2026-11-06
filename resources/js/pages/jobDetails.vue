@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const authenticated = Boolean(bootstrap.authenticated);
@@ -22,6 +22,16 @@ const applicationForm = ref(null);
 const saved = ref(false);
 const profileCanApply = ref(true);
 const reporting = ref(false);
+const accountPromptOpen = ref(false);
+const accountPromptButton = ref(null);
+let accountPromptTrigger = null;
+const reportDialog = ref(false);
+const reportTarget = ref({ type: 'job', id: null });
+const reportReason = ref('');
+const reportDetails = ref('');
+const reportError = ref('');
+const reportReasonInput = ref(null);
+let reportTrigger = null;
 const canApply = computed(() => role === 'job_seeker' && Boolean(bootstrap.authenticated) && profileCanApply.value);
 
 function currentJobId() {
@@ -131,27 +141,84 @@ async function shareJob() {
 
 async function reportJob(targetType = 'job', targetId = job.value?.id) {
     if (!authenticated) { error.value = 'Sign in to report content.'; return; }
-    const details = window.prompt(`Briefly explain why this ${targetType === 'job' ? 'listing' : 'employer'} should be reviewed.`);
-    if (details === null) return;
-    reporting.value = true; error.value = ''; notice.value = '';
+    reportTrigger = document.activeElement;
+    reportTarget.value = { type: targetType, id: targetId };
+    reportReason.value = '';
+    reportDetails.value = '';
+    reportError.value = '';
+    reportDialog.value = true;
+    await nextTick();
+    reportReasonInput.value?.focus();
+}
+
+async function submitReport() {
+    if (reporting.value) return;
+    if (!reportReason.value) { reportError.value = 'Choose a reason for this report.'; return; }
+    if (reportDetails.value.length > 2000) { reportError.value = 'Report details must be 2000 characters or fewer.'; return; }
+    reporting.value = true; reportError.value = ''; error.value = ''; notice.value = '';
     try {
-        const { data } = await window.axios.post('/api/reports', { target_type: targetType, target_id: targetId, reason: 'other', details: details.trim() || null });
+        const { data } = await window.axios.post('/api/reports', {
+            target_type: reportTarget.value.type,
+            target_id: reportTarget.value.id,
+            reason: reportReason.value,
+            details: reportDetails.value.trim() || null,
+        });
         notice.value = data.message;
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not submit this report.'; }
-    finally { reporting.value = false; }
+        reporting.value = false;
+        closeReportDialog();
+    } catch (exception) {
+        const validation = exception.response?.data?.errors;
+        reportError.value = validation ? Object.values(validation).flat().join(' ') : exception.response?.data?.message ?? 'Could not submit this report.';
+    } finally { reporting.value = false; }
+}
+
+function closeReportDialog() {
+    if (!reporting.value) {
+        reportDialog.value = false;
+        nextTick(() => reportTrigger?.focus?.());
+    }
 }
 
 function scrollToApplication() {
     if (!canApply.value) {
-        error.value = !authenticated ? 'Sign in or create a job seeker account to apply.' : role !== 'job_seeker' ? 'Only job seeker accounts can apply for jobs.' : 'Your job seeker profile is inactive. Update your profile before applying.';
+        if (!authenticated) {
+            error.value = '';
+            accountPromptTrigger = document.activeElement;
+            accountPromptOpen.value = true;
+            nextTick(() => accountPromptButton.value?.focus());
+            return;
+        }
+        error.value = role !== 'job_seeker' ? 'Only job seeker accounts can apply for jobs.' : 'Your job seeker profile is inactive. Update your profile before applying.';
         return;
     }
     applicationForm.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+function closeAccountPrompt() {
+    accountPromptOpen.value = false;
+    nextTick(() => accountPromptTrigger?.focus?.());
+}
+
 function onHashChange() { loadJob(); }
-onMounted(() => { window.addEventListener('hashchange', onHashChange); loadJob(); });
-onUnmounted(() => window.removeEventListener('hashchange', onHashChange));
+function onReportKeydown(event) {
+    const accountPrompt = accountPromptOpen.value;
+    if (!reportDialog.value && !accountPrompt) return;
+    if (event.key === 'Escape') {
+        if (accountPrompt) closeAccountPrompt();
+        else closeReportDialog();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const dialog = document.querySelector(accountPrompt ? '[data-account-prompt]' : '[aria-labelledby="report-dialog-title"]');
+    const focusable = dialog?.querySelectorAll('button:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+onMounted(() => { window.addEventListener('hashchange', onHashChange); window.addEventListener('keydown', onReportKeydown); loadJob(); });
+onUnmounted(() => { window.removeEventListener('hashchange', onHashChange); window.removeEventListener('keydown', onReportKeydown); });
 </script>
 
 <template>
@@ -176,7 +243,7 @@ onUnmounted(() => window.removeEventListener('hashchange', onHashChange));
                         <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"><h2 class="text-lg font-bold text-slate-900">{{ $t('About the role') }}</h2><p class="mt-3 whitespace-pre-line text-sm leading-7 text-slate-700">{{ job.description }}</p><template v-if="requirementsList(job.requirements).length"><h3 class="mt-7 text-base font-bold text-slate-900">{{ $t('Requirements') }}</h3><ul class="mt-3 space-y-2"> <li v-for="(requirement, index) in requirementsList(job.requirements)" :key="index" class="flex gap-2.5 text-sm leading-6 text-slate-700"><i class="ti ti-check mt-1 shrink-0 text-blue-700" aria-hidden="true"/><span>{{ requirement }}</span></li></ul></template></article>
 
                         <article v-if="role !== 'employer'" ref="applicationForm" class="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"><h2 class="text-lg font-bold text-slate-900">Apply for {{ job.title }}</h2><p class="mt-1 text-sm text-slate-600">Your application and contact details will be shared with this employer.</p>
-                            <div v-if="!authenticated" class="mt-5 rounded-lg bg-blue-50 p-4 text-sm text-blue-950">Please <a href="/login" class="font-semibold underline">sign in</a> or <a href="/register" class="font-semibold underline">create a job seeker account</a> to apply.</div>
+                            <div v-if="!authenticated" class="mt-5 rounded-lg bg-blue-50 p-4 text-sm text-blue-950">{{ $t('Create an account to submit an application. You can continue browsing jobs without one.') }}</div>
                             <div v-else-if="role !== 'job_seeker'" class="mt-5 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">This account is registered as an employer and cannot apply for jobs.</div>
                             <div v-else-if="hasApplied" class="mt-5 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">Your application has been received. You can follow its status from your profile.</div>
                             <form v-else class="mt-5 space-y-4" @submit.prevent="submitApplication"><p v-if="error" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ $t(error) }}</p><p v-if="notice" class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{{ $t(notice) }}</p><div v-if="hasResume" class="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-950"><i class="ti ti-file-check mr-1" aria-hidden="true"/>Your profile CV will be attached{{ resumeName ? ` (${resumeName})` : '' }}. Upload a new file below to use a different CV.</div><label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">Cover letter <span class="font-normal text-slate-500">(optional)</span></span><textarea v-model="coverLetter" rows="5" maxlength="5000" placeholder="Briefly explain your interest and relevant experience." class="w-full rounded-lg border border-slate-300 px-3.5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"/></label><label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">CV or resume <span class="font-normal text-slate-500">(optional if your profile has one)</span></span><input type="file" accept=".pdf,.doc,.docx" class="block w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-blue-900" @change="handleCv"><span class="mt-1 block text-xs text-slate-500">PDF, DOC, or DOCX · up to 10 MB</span></label><button type="submit" :disabled="submitting" class="inline-flex items-center gap-2 rounded-lg bg-[var(--brand-primary)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:cursor-wait disabled:opacity-60"><i :class="submitting ? 'ti ti-loader-2 animate-spin' : 'ti ti-send'" aria-hidden="true"/>{{ submitting ? 'Submitting…' : 'Submit application' }}</button></form>
@@ -188,4 +255,50 @@ onUnmounted(() => window.removeEventListener('hashchange', onHashChange));
             </template>
         </div>
     </section>
+    <Teleport to="body">
+        <div v-if="accountPromptOpen" class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" @click.self="closeAccountPrompt">
+            <section data-account-prompt class="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl sm:rounded-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="account-prompt-title" aria-describedby="account-prompt-description">
+                <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-2xl text-blue-800"><i class="ti ti-user-plus" aria-hidden="true"/></div>
+                <h2 id="account-prompt-title" class="mt-4 text-center text-xl font-bold text-slate-950">{{ $t('Create an account to apply') }}</h2>
+                <p id="account-prompt-description" class="mt-2 text-center text-sm leading-6 text-slate-600">{{ $t('Create a free job seeker account to apply for this job, or continue browsing without signing up.') }}</p>
+                <div class="mt-6 grid gap-3">
+                    <a ref="accountPromptButton" href="/register" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] focus:outline-none focus:ring-4 focus:ring-blue-200"><i class="ti ti-user-plus" aria-hidden="true"/>{{ $t('Create job seeker account') }}</a>
+                    <button type="button" class="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100" @click="closeAccountPrompt">{{ $t('Continue browsing') }}</button>
+                </div>
+            </section>
+        </div>
+        <div v-if="reportDialog" class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" @click.self="closeReportDialog">
+            <section class="w-full max-w-xl rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title" aria-describedby="report-dialog-description">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div class="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-amber-50 text-xl text-amber-800"><i class="ti ti-flag" aria-hidden="true"/></div>
+                        <h2 id="report-dialog-title" class="text-xl font-bold text-slate-950">{{ $t('Report content') }}</h2>
+                        <p id="report-dialog-description" class="mt-1 text-sm leading-6 text-slate-600">{{ $t(reportTarget.type === 'job' ? 'Tell us why this listing should be reviewed.' : 'Tell us why this employer should be reviewed.') }}</p>
+                    </div>
+                    <button type="button" class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-4 focus:ring-blue-100" :aria-label="$t('Close')" :disabled="reporting" @click="closeReportDialog"><i class="ti ti-x" aria-hidden="true"/></button>
+                </div>
+                <form class="mt-5 space-y-4" @submit.prevent="submitReport">
+                    <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">{{ $t('Reason') }} <span class="text-red-700">*</span></span>
+                        <select ref="reportReasonInput" v-model="reportReason" required class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100">
+                            <option value="" disabled>{{ $t('Select a reason') }}</option>
+                            <option value="fraud">{{ $t('Fraud or scam') }}</option>
+                            <option value="misleading">{{ $t('Misleading information') }}</option>
+                            <option value="abusive">{{ $t('Abusive or harmful content') }}</option>
+                            <option value="inappropriate">{{ $t('Inappropriate content') }}</option>
+                            <option value="other">{{ $t('Other reason') }}</option>
+                        </select>
+                    </label>
+                    <label class="block"><span class="mb-1.5 block text-sm font-semibold text-slate-700">{{ $t('Additional details') }} <span class="font-normal text-slate-500">({{ $t('optional') }})</span></span>
+                        <textarea v-model="reportDetails" rows="4" maxlength="2000" :placeholder="$t('Share any details that may help our review team.')" class="w-full resize-y rounded-lg border border-slate-300 px-3.5 py-3 text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"/>
+                        <span class="mt-1 block text-right text-xs text-slate-500">{{ reportDetails.length }}/2000</span>
+                    </label>
+                    <p v-if="reportError" class="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-800" role="alert">{{ $t(reportError) }}</p>
+                    <div class="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                        <button type="button" :disabled="reporting" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60" @click="closeReportDialog">{{ $t('Cancel') }}</button>
+                        <button type="submit" :disabled="reporting || !reportReason" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:cursor-wait disabled:opacity-60"><i :class="reporting ? 'ti ti-loader-2 animate-spin' : 'ti ti-send'" aria-hidden="true"/>{{ reporting ? $t('Submitting report…') : $t('Submit report') }}</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </Teleport>
 </template>
