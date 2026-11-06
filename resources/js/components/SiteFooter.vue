@@ -14,6 +14,7 @@ defineProps({
             </div>
             <nav class="flex flex-wrap gap-x-6 gap-y-3 text-sm" :aria-label="$t('Footer navigation')">
                 <a href="/#search" class="transition hover:text-white">{{ $t('Find Jobs') }}</a>
+                <a href="/companies" class="transition hover:text-white">{{ $t('Companies') }}</a>
                 <a v-if="isAuthenticated && userRole === 'employer'" href="/#dashboard" class="transition hover:text-white">{{ $t('For Employers') }}</a>
                 <a href="/#insights" class="transition hover:text-white">{{ $t('Salary Insights') }}</a>
                 <a v-if="isAuthenticated && userRole === 'job_seeker'" href="/#skills-assessment" class="transition hover:text-white">{{ $t('Skills Assessment') }}</a>

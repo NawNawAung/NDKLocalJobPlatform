@@ -73,6 +73,7 @@ const profileActions = computed(() => {
 const links = computed(() => [
     { label: t('Home'), href: '/' },
     { label: t('Jobs'), href: '/#search' },
+    { label: t('Companies'), href: '/companies' },
     { label: t('Salary Insights'), href: '/#insights' },
     ...(props.isAuthenticated && props.userRole === 'job_seeker' ? [
         { label: t('Skills'), href: '/#skills-assessment' },
@@ -97,6 +98,7 @@ function isActive(link) {
     if (link.href === '/admin') return currentPath.value === '/admin' && !currentHash.value;
     if (link.href.startsWith('/admin#')) return currentPath.value === '/admin' && currentHash.value === link.href.slice('/admin'.length);
     if (link.href === '/profile') return currentPath.value === '/profile' || currentHash.value === '#profile';
+    if (link.href === '/companies') return currentPath.value === '/companies' || currentPath.value.startsWith('/companies/');
     if (link.href === '/') {
         return currentPath.value === '/' && !currentHash.value && pageType !== 'search';
     }
@@ -114,8 +116,8 @@ function isActive(link) {
                 <img :src="'/images/brand/NDKJobPlatformLogo-auth.jpeg'" alt="NDK Job Platform" class="h-16 w-16 object-contain" />
             </a>
 
-            <div class="hidden items-center gap-5 xl:flex">
-                <a v-for="link in links" :key="link.href" :href="link.href" :aria-current="isActive(link) ? 'page' : undefined" :class="isActive(link) ? 'bg-blue-50 text-blue-800 ring-1 ring-blue-200 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-[var(--brand-primary)]'" class="site-nav-link rounded-lg px-3 py-2 text-sm font-semibold transition">{{ link.label }}</a>
+            <div class="site-nav-links hidden min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto xl:flex">
+                <a v-for="link in links" :key="link.href" :href="link.href" :aria-current="isActive(link) ? 'page' : undefined" :class="isActive(link) ? 'bg-blue-50 text-blue-800 ring-1 ring-blue-200 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-[var(--brand-primary)]'" class="site-nav-link shrink-0 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-semibold transition">{{ link.label }}</a>
             </div>
 
             <div class="hidden shrink-0 items-center gap-3 md:flex">

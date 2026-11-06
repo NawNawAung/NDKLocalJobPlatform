@@ -110,6 +110,7 @@ class JobSearchController extends Controller
                 'title' => $job->title,
                 'category' => $job->jobCategory?->name ?? $job->category,
                 'category_id' => $job->category_id,
+                'company_id' => $job->employer_id,
                 'company' => $job->employer?->company_name ?? $job->employer?->user?->name ?? 'Employer',
                 'company_rating' => $job->employer?->approved_reviews_avg_rating !== null ? round((float) $job->employer->approved_reviews_avg_rating, 1) : null,
                 'company_review_count' => $job->employer?->approved_reviews_count ?? 0,

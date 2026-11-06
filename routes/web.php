@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\EmployerReviewController;
 use App\Http\Controllers\EmployerWorkspaceController;
@@ -16,8 +17,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
+Route::get('/companies', [AuthController::class, 'companiesPage'])->name('companies.page');
+Route::get('/companies/{employer}', [AuthController::class, 'companyProfilePage'])->whereNumber('employer')->name('companies.show');
 Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
+Route::get('/api/companies', [CompanyController::class, 'index'])->name('companies.index');
+Route::get('/api/companies/{employer}', [CompanyController::class, 'show'])->name('companies.profile');
 Route::get('/api/salary-insights', SalaryInsightsController::class)->name('salary-insights.index');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
 Route::get('/api/job-categories', [JobCategoryController::class, 'index'])->name('job-categories.index');

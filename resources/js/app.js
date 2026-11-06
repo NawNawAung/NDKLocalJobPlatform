@@ -16,6 +16,8 @@ import BillingCenter from './pages/BillingCenter.vue';
 import AdminBilling from './pages/AdminBilling.vue';
 import TalentSearch from './pages/TalentSearch.vue';
 import AdminDashboard from './pages/AdminDashboard.vue';
+import CompanyDirectory from './pages/CompanyDirectory.vue';
+import CompanyProfile from './pages/CompanyProfile.vue';
 import SiteHeader from './components/SiteHeader.vue';
 import SiteFooter from './components/SiteFooter.vue';
 import { t } from './i18n.js';
@@ -38,6 +40,7 @@ const pages = {
 const currentHash = ref(window.location.hash);
 const currentRouteHash = computed(() => currentHash.value.split('?')[0]);
 const authBootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
+const showSiteChrome = !['login', 'register'].includes(authBootstrap.authPage);
 window.axios.defaults.headers.common['X-CSRF-TOKEN'] = authBootstrap.csrfToken ?? '';
 window.addEventListener('hashchange', () => {
     currentHash.value = window.location.hash;
@@ -49,6 +52,8 @@ const app = createApp({
             if (authBootstrap.authPage === 'login') return LoginPage;
             if (authBootstrap.authPage === 'register') return RegisterPage;
             if (authBootstrap.page === 'profile') return JobSeekerProfile;
+            if (authBootstrap.page === 'companies') return CompanyDirectory;
+            if (authBootstrap.page === 'company-profile') return CompanyProfile;
             if (authBootstrap.page === 'admin' && !currentHash.value) return AdminDashboard;
             if (authBootstrap.page === 'search' && !currentHash.value) return JobSearch;
             const employerPages = ['#post-job', '#pipeline', '#dashboard', '#billing', '#talent'];
@@ -61,17 +66,22 @@ const app = createApp({
             return pages[currentRouteHash.value] ?? Home;
         });
 
+        const sharedHeader = showSiteChrome ? h(SiteHeader, {
+            isAuthenticated: authBootstrap.authenticated,
+            csrfToken: authBootstrap.csrfToken,
+            userRole: authBootstrap.role,
+            userName: authBootstrap.userName,
+            userEmail: authBootstrap.userEmail,
+            profilePhotoUrl: authBootstrap.profilePhotoUrl,
+        }) : null;
+        const sharedFooter = showSiteChrome
+            ? h(SiteFooter, { isAuthenticated: authBootstrap.authenticated, userRole: authBootstrap.role })
+            : null;
+
         return () => h('div', { class: 'min-h-screen bg-slate-50 text-slate-900' }, [
-            h(SiteHeader, {
-                isAuthenticated: authBootstrap.authenticated,
-                csrfToken: authBootstrap.csrfToken,
-                userRole: authBootstrap.role,
-                userName: authBootstrap.userName,
-                userEmail: authBootstrap.userEmail,
-                profilePhotoUrl: authBootstrap.profilePhotoUrl,
-            }),
+            sharedHeader,
             h('main', { id: 'page-content' }, [h(currentPage.value)]),
-            h(SiteFooter, { isAuthenticated: authBootstrap.authenticated, userRole: authBootstrap.role }),
+            sharedFooter,
         ]);
     },
 });

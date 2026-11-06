@@ -8,8 +8,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { color-scheme: light; font-family: Inter, "Noto Sans Myanmar", "Myanmar Text", Padauk, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172554; }
-        :lang(my) { line-height: 1.7; letter-spacing: 0; }
+        :root { color-scheme: light; font-family: Inter, "Noto Sans Myanmar", "Pyidaungsu", "Myanmar Text", Padauk, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172554; }
+        :lang(my) { font-family: "Noto Sans Myanmar", "Pyidaungsu", "Myanmar Text", Padauk, Inter, ui-sans-serif, system-ui, sans-serif; line-height: 1.75; letter-spacing: normal; }
+        :lang(my) :where(*) { letter-spacing: normal; }
+        :lang(my) :where(h1, h2, h3, p, li, label, button, th, td) { line-height: 1.65; }
         * { box-sizing: border-box; }
         body { margin: 0; padding: 40px 20px; background: #f1f5f9; }
         .invoice { max-width: 820px; margin: auto; padding: 48px; background: white; border: 1px solid #dbe3ef; border-radius: 14px; box-shadow: 0 12px 35px #0f172a0c; }

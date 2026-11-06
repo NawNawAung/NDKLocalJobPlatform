@@ -12,7 +12,7 @@ function localizeStaticInterfaceText(node, context) {
         type: NodeTypes.INTERPOLATION,
         content: {
             type: NodeTypes.SIMPLE_EXPRESSION,
-            content: `$t(${JSON.stringify(node.content)})`,
+            content: `_ctx.$t(${JSON.stringify(node.content)})`,
             isStatic: false,
             constType: 0,
             loc: node.loc,

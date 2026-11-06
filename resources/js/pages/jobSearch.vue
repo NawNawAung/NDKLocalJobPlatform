@@ -5,6 +5,7 @@ const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const regions = bootstrap.regions ?? [];
 const isEmployer = bootstrap.role === 'employer';
 const params = new URLSearchParams(window.location.search);
+const filtersOpen = ref([...params.keys()].some((key) => !['page', 'sort'].includes(key)));
 const filters = reactive({
     keyword: params.get('keyword') ?? '',
     region_id: params.get('region_id') ?? '',
@@ -68,6 +69,11 @@ function resetFilters() {
         keyword: '', region_id: '', township_id: '', category_id: '', experience_level: '',
         employment_type: '', work_mode: '', salary_min: '', salary_max: '', date_posted: '', sort: 'latest',
     });
+    loadJobs();
+}
+
+function submitFilters() {
+    filtersOpen.value = false;
     loadJobs();
 }
 
@@ -141,11 +147,15 @@ onMounted(async () => {
             <div class="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <aside class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="mb-5 flex items-center justify-between">
-                        <h2 class="font-semibold text-slate-900">{{ $t('Filters') }}</h2>
+                        <h2 class="hidden font-semibold text-slate-900 lg:block">{{ $t('Filters') }}</h2>
+                        <button type="button" class="inline-flex items-center gap-2 font-semibold text-slate-900 lg:hidden" :aria-expanded="filtersOpen" aria-controls="job-search-filters" @click="filtersOpen = !filtersOpen">
+                            {{ $t('Filters') }}
+                            <i :class="filtersOpen ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" aria-hidden="true" />
+                        </button>
                         <button type="button" class="text-sm font-medium text-[var(--brand-primary)] hover:underline" @click="resetFilters">{{ $t('Clear all') }}</button>
                     </div>
 
-                    <form class="space-y-4" @submit.prevent="loadJobs()">
+                    <form id="job-search-filters" :class="filtersOpen ? 'block' : 'hidden lg:block'" class="space-y-4" @submit.prevent="submitFilters">
                         <label class="block">
                             <span class="mb-1.5 block text-sm font-medium text-slate-700">{{ $t('Job title or keyword') }}</span>
                             <input v-model="filters.keyword" type="search" :placeholder="$t('Title, skills, company')" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-4 focus:ring-blue-100">
@@ -220,7 +230,7 @@ onMounted(async () => {
                         <article v-for="job in jobs" :key="job.id" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md sm:p-6">
                             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                                 <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)]">{{ job.company }}</p>
+                                    <a :href="`/companies/${job.company_id}`" class="inline-block text-xs font-semibold uppercase tracking-wide text-[var(--brand-primary)] hover:underline">{{ job.company }}</a>
                                     <p v-if="job.company_rating" class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><i class="ti ti-star-filled" aria-hidden="true"/>{{ Number(job.company_rating).toFixed(1) }} <span class="font-normal text-slate-500">({{ job.company_review_count }} {{ $t('reviews') }})</span></p>
                                     <h2 class="mt-1 text-lg font-bold text-[var(--brand-ink)]">{{ job.title }}</h2>
                                     <span v-if="job.is_featured" class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900"><i class="ti ti-star-filled" aria-hidden="true"/>{{ $t('Featured') }}</span>

@@ -16,6 +16,9 @@ const advancedFiltersOpen = ref(false);
 const featuredJobs = ref([]);
 const featuredLoading = ref(true);
 const featuredError = ref('');
+const companies = ref([]);
+const companiesLoading = ref(true);
+const companiesError = ref('');
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const isEmployer = bootstrap.role === 'employer';
 const regions = bootstrap.regions ?? [];
@@ -88,16 +91,25 @@ function applicationStatusClass(status) {
 }
 
 onMounted(async () => {
-    try {
-        const [{ data }, categoryResponse] = await Promise.all([
-            window.axios.get('/api/jobs/search'),
-            window.axios.get('/api/job-categories'),
-        ]);
-        featuredJobs.value = (data.data ?? []).slice(0, 3);
-        categories.value = categoryResponse.data.categories ?? [];
-    } catch {
+    const [jobsResult, categoriesResult, companiesResult] = await Promise.allSettled([
+        window.axios.get('/api/jobs/search'),
+        window.axios.get('/api/job-categories'),
+        window.axios.get('/api/companies', { params: { page: 1, hiring_only: 1 } }),
+    ]);
+
+    if (jobsResult.status === 'fulfilled') {
+        featuredJobs.value = (jobsResult.value.data.data ?? []).filter(job => job.is_featured).slice(0, 3);
+    } else {
         featuredError.value = 'Featured jobs are unavailable right now.';
-    } finally { featuredLoading.value = false; }
+    }
+    if (categoriesResult.status === 'fulfilled') categories.value = categoriesResult.value.data.categories ?? [];
+    if (companiesResult.status === 'fulfilled') {
+        companies.value = companiesResult.value.data.companies?.data?.slice(0, 4) ?? [];
+    } else {
+        companiesError.value = 'Company information is unavailable right now.';
+    }
+    featuredLoading.value = false;
+    companiesLoading.value = false;
 });
 </script>
 
@@ -191,39 +203,21 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <div class="px-20 py-16 max-sm:px-4 max-sm:py-10">
-          <div class="mb-6 text-2xl font-bold leading-8 text-gray-900">Top Hiring Companies</div>
-          <div class="grid grid-cols-4 gap-5 max-md:grid-cols-2 max-sm:grid-cols-1">
-            <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/kbzLogo.png'" alt="KBZ Group logo" />
-              <div class="text-center">
-                <div class="text-base font-semibold leading-6 text-gray-900">KBZ Group</div>
-                <div class="text-sm leading-5 text-gray-500">42 Open Jobs</div>
-              </div>
-            </div>
-            <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/grabLogo.webp'" alt="Grab Myanmar logo" />
-              <div class="text-center">
-                <div class="text-base font-semibold leading-6 text-gray-900">Grab Myanmar</div>
-                <div class="text-sm leading-5 text-gray-500">18 Open Jobs</div>
-              </div>
-            </div>
-            <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/waveLogo.jpg'" alt="Wave Money logo" />
-              <div class="text-center">
-                <div class="text-base font-semibold leading-6 text-gray-900">Wave Money</div>
-                <div class="text-sm leading-5 text-gray-500">12 Open Jobs</div>
-              </div>
-            </div>
-            <div class="flex flex-col gap-3 items-center p-6 rounded-xl border border border-solid transition-shadow ease-in-out cursor-pointer duration">
-              <img class="w-[64px] h-[64px] rounded-[8px] object-cover" :src="'/images/companies/cdsgLogo.png'" alt="CDSG Group logo" />
-              <div class="text-center">
-                <div class="text-base font-semibold leading-6 text-gray-900">CDSG Group</div>
-                <div class="text-sm leading-5 text-gray-500">25 Open Jobs</div>
-              </div>
-            </div>
+        <section class="px-5 py-12 sm:px-8 sm:py-14 lg:px-12 xl:px-20" aria-labelledby="top-companies-heading">
+          <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div><p class="text-sm font-semibold text-[var(--brand-primary)]">{{ $t('Meet employers') }}</p><h2 id="top-companies-heading" class="mt-1 text-2xl font-bold leading-8 text-gray-900">{{ $t('Companies hiring') }}</h2></div>
+            <a href="/companies" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:underline">{{ $t('Explore all companies') }}<i class="ti ti-arrow-right" aria-hidden="true" /></a>
           </div>
-        </div>
+          <p v-if="companiesError" class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ $t(companiesError) }}</p>
+          <div v-else-if="companiesLoading" class="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600" role="status">{{ $t('Loading companies…') }}</div>
+          <div v-else-if="companies.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <a v-for="company in companies" :key="company.id" :href="`/companies/${company.id}`" class="group flex min-w-0 items-start gap-3 rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+              <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-2xl text-blue-800"><i class="ti ti-building" aria-hidden="true" /></span>
+              <span class="min-w-0 flex-1"><span class="flex flex-wrap items-center gap-1.5 font-semibold text-slate-900 group-hover:text-blue-800"><span class="break-words">{{ company.name }}</span><i v-if="company.is_verified" class="ti ti-circle-check text-emerald-700" :aria-label="$t('Verified employer')" /></span><span class="mt-1 block text-sm text-slate-500">{{ company.open_jobs_count }} {{ $t('open jobs') }}</span><span v-if="company.location" class="mt-1 block truncate text-xs text-slate-500">{{ company.location }}</span></span>
+            </a>
+          </div>
+          <div v-else class="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600">{{ $t('No companies found') }} <a href="/companies" class="font-semibold text-blue-800 hover:underline">{{ $t('Browse companies') }}</a></div>
+        </section>
         <div class="px-20 pb-16 max-sm:px-4 max-sm:pb-10">
           <div class="mb-6 text-2xl font-bold leading-8 text-gray-900">Popular Job Categories</div>
           <div class="grid grid-cols-4 gap-5 max-md:grid-cols-2 max-sm:grid-cols-1">
@@ -259,43 +253,25 @@ onMounted(async () => {
         </div>
         <div class="px-20 pb-16 max-sm:px-4 max-sm:pb-10">
           <div class="flex justify-between items-center mb-6">
-            <div class="text-2xl font-bold leading-8 text-gray-900">{{ isEmployer ? 'Recently published by other employers' : 'Recommended For You' }}</div>
+            <div class="text-2xl font-bold leading-8 text-gray-900">{{ $t('Featured Jobs') }}</div>
             <a href="#search" class="flex gap-1.5 items-center">
               <span class="text-sm font-medium text-blue-500">View All Jobs</span>
               <i class="ti ti-arrow-right text-base text-blue-500" />
             </a>
           </div>
           <p v-if="featuredError" class="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{{ featuredError }} <a href="/jobs" class="font-semibold underline">Browse all jobs</a></p>
-          <div v-else-if="featuredLoading" class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">Loading current openings…</div>
+          <div v-else-if="featuredLoading" class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-600">{{ $t('Loading featured jobs…') }}</div>
           <div v-else-if="featuredJobs.length" class="flex flex-col gap-4">
             <article v-for="job in featuredJobs" :key="job.id" class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-blue-200 hover:shadow-sm">
               <div class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-blue-50 text-lg font-bold text-blue-900">{{ job.company?.slice(0, 2)?.toUpperCase() || 'CO' }}</div>
               <div class="min-w-0 flex-1">
                 <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span v-if="job.is_featured" class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900"><i class="ti ti-star-filled" aria-hidden="true"/>Featured</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="!isEmployer && job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
-                <div class="flex flex-wrap items-center gap-2 text-sm"><span class="font-medium text-blue-800">{{ job.company }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ job.location }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ formatSalary(job) }}</span></div>
+              <div class="flex flex-wrap items-center gap-2 text-sm"><a :href="`/companies/${job.company_id}`" class="font-medium text-blue-800 hover:underline">{{ job.company }}</a><span class="text-slate-400">·</span><span class="text-slate-600">{{ job.location }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ formatSalary(job) }}</span></div>
               </div>
               <div class="flex shrink-0 items-center gap-3"><span class="text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span><a :href="`/#details?job=${job.id}`" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ isEmployer ? 'View job details' : job.application_status ? 'View application' : 'View and apply' }}</a></div>
             </article>
           </div>
-          <div v-else class="rounded-xl border border-dashed border-slate-300 p-8 text-center"><p class="text-sm text-slate-600">There are no published jobs yet.</p><a href="/jobs" class="mt-3 inline-flex font-semibold text-[var(--brand-primary)] hover:underline">Browse jobs</a></div>
-        </div>
-        <div class="px-20 py-10 bg-cyan-900 max-sm:px-4 max-sm:py-8">
-          <div class="flex justify-between items-center max-sm:flex-col max-sm:gap-6 max-sm:items-start">
-            <div class="flex gap-2 items-center">
-              <div class="flex gap-1.5 items-center">
-                <div class="w-2 h-2 bg-blue-300 rounded-full" />
-                <span class="text-base font-bold text-white">NDK</span>
-              </div>
-              <span class="text-sm text-blue-300">· Myanmar's Job Platform</span>
-            </div>
-            <div class="flex gap-6 items-center max-sm:flex-wrap max-sm:gap-4">
-              <span class="text-sm text-blue-300 cursor-pointer">About NDK</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Privacy Policy</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Terms</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Contact</span>
-            </div>
-          </div>
-          <div class="mt-6 text-xs text-center text-slate-400">© 2026 NDK Job Platform. Structured Wireframe representation.</div>
+          <div v-else class="rounded-xl border border-dashed border-slate-300 p-8 text-center"><p class="text-sm text-slate-600">{{ $t('There are no featured jobs right now.') }}</p><a href="/jobs" class="mt-3 inline-flex font-semibold text-[var(--brand-primary)] hover:underline">{{ $t('Browse all jobs') }}</a></div>
         </div>
       </div>
 </template>

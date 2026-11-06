@@ -1,34 +1,5 @@
 <template>
       <div class="flex flex-col bg-white min-h-screen">
-        <div class="flex top-0 z-50 justify-between items-center px-8 py-4 bg-white border border-b">
-          <div class="flex gap-4 items-center">
-            <div class="flex gap-2 items-center">
-              <span class="text-xl font-extrabold tracking-normal leading-7 text-cyan-900">NDK</span>
-              <span class="px-2 py-0.5 text-xs font-bold tracking-wider text-blue-800 uppercase bg-blue-100 rounded">MYANMAR</span>
-            </div>
-            <div class="flex gap-6 items-center ml-8 max-sm:hidden">
-              <span class="text-sm font-medium text-gray-500 cursor-pointer">Jobs</span>
-              <span class="pb-0.5 text-sm font-semibold text-cyan-900 border-2 border-cyan-900 cursor-pointer">Skills &amp; Badges</span>
-              <span class="text-sm font-medium text-gray-500 cursor-pointer">Salary Insights</span>
-            </div>
-          </div>
-          <div class="flex gap-3 items-center">
-            <div class="flex justify-center items-center w-8 h-8 cursor-pointer max-sm:hidden">
-              <i class="ti ti-search text-xl text-gray-500" />
-            </div>
-            <div class="flex gap-1.5 items-center px-3 py-1.5 bg-indigo-100 rounded-full cursor-pointer max-sm:hidden">
-              <div class="flex justify-center items-center w-4 h-4 bg-indigo-500 rounded-full">
-                <div class="w-2 h-2 bg-white rounded-full" />
-              </div>
-              <span class="text-sm font-medium text-indigo-700">Recruiter Mode</span>
-            </div>
-            <span class="text-sm font-medium text-gray-700 cursor-pointer max-sm:hidden">Sign In</span>
-            <div class="px-4 py-2 text-sm font-semibold text-white bg-cyan-900 rounded-lg cursor-pointer max-sm:hidden">Post a Job</div>
-            <div class="hidden justify-center items-center w-8 h-8 max-sm:flex">
-              <i class="ti ti-menu-2 text-2xl text-gray-700" />
-            </div>
-          </div>
-        </div>
         <div class="flex flex-col items-center px-8 py-14 text-center bg-blue-100">
           <div class="px-3 py-1 mb-5 text-xs font-bold tracking-wide text-white uppercase bg-cyan-900 rounded">NDK VERIFIED BADGES</div>
           <div class="mb-4 text-4xl font-extrabold tracking-normal leading-tight text-gray-900 max-w-[700px] max-sm:text-3xl">Stand Out to Myanmar's Top Employers</div>
@@ -219,23 +190,6 @@
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-        <div class="px-8 py-10 bg-cyan-900 max-sm:px-4">
-          <div class="flex justify-between items-center mx-auto max-w-[1200px] max-sm:flex-col max-sm:gap-6 max-sm:items-start">
-            <div class="flex gap-2 items-center">
-              <span class="text-lg font-extrabold text-white">NDK</span>
-              <span class="text-sm text-blue-300">· Myanmar's Premier Job Platform</span>
-            </div>
-            <div class="flex gap-6 items-center max-sm:flex-wrap max-sm:gap-4">
-              <span class="text-sm text-blue-300 cursor-pointer">About NDK</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Privacy Policy</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Terms of Service</span>
-              <span class="text-sm text-blue-300 cursor-pointer">Contact Support</span>
-            </div>
-          </div>
-          <div class="pt-5 mx-auto mt-6 border-t border-cyan-800 max-w-[1200px]">
-            <div class="text-xs text-center text-slate-400">© 2026 NDK Job Platform. Connecting Myanmar's brightest talent with top employers in Yangon, Mandalay, and beyond.</div>
           </div>
         </div>
       </div>

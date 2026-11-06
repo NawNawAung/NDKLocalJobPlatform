@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employer;
 use App\Models\Region;
 use App\Models\Skill;
 use App\Models\User;
@@ -25,6 +26,18 @@ class AuthController extends Controller
     public function searchPage(): View
     {
         return $this->appView(null, 'search');
+    }
+
+    public function companiesPage(): View
+    {
+        return $this->appView(null, 'companies');
+    }
+
+    public function companyProfilePage(Employer $employer): View
+    {
+        abort_unless($employer->user()->where('status', true)->exists(), 404);
+
+        return $this->appView(null, 'company-profile', false, $employer->id);
     }
 
     public function profilePage(): View
@@ -365,7 +378,7 @@ class AuthController extends Controller
         return Storage::disk('local')->download($jobSeeker->cv_path, basename($jobSeeker->cv_original_name ?: $jobSeeker->cv_path));
     }
 
-    private function appView(?string $authPage = null, string $page = 'home', bool $adminLogin = false): View
+    private function appView(?string $authPage = null, string $page = 'home', bool $adminLogin = false, ?int $companyId = null): View
     {
         $user = Auth::user();
         $seekerProfile = null;
@@ -392,6 +405,7 @@ class AuthController extends Controller
         $authBootstrap = [
             'authPage' => $authPage,
             'page' => $page,
+            'companyId' => $companyId,
             'adminLogin' => $adminLogin,
             'authenticated' => Auth::check(),
             'role' => $user?->role,
