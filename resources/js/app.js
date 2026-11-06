@@ -9,7 +9,6 @@ import JobSeekerProfile from './pages/jobSeekerProfile.vue';
 import EmployerDashboard from './pages/employerDashboard.vue';
 import InsightPage from './pages/insightPage.vue';
 import MessagePage from './pages/messagePage.vue';
-import SkillsAssessment from './pages/skillsAccessment.vue';
 import LoginPage from './pages/login.vue';
 import RegisterPage from './pages/register.vue';
 import BillingCenter from './pages/BillingCenter.vue';
@@ -18,6 +17,7 @@ import TalentSearch from './pages/TalentSearch.vue';
 import AdminDashboard from './pages/AdminDashboard.vue';
 import CompanyDirectory from './pages/CompanyDirectory.vue';
 import CompanyProfile from './pages/CompanyProfile.vue';
+import AdminAdvertising from './pages/AdminAdvertising.vue';
 import SiteHeader from './components/SiteHeader.vue';
 import SiteFooter from './components/SiteFooter.vue';
 import { t } from './i18n.js';
@@ -30,9 +30,9 @@ const pages = {
     '#dashboard': EmployerDashboard,
     '#insights': InsightPage,
     '#messages': MessagePage,
-    '#skills-assessment': SkillsAssessment,
     '#billing': BillingCenter,
     '#admin-billing': AdminBilling,
+    '#admin-ads': AdminAdvertising,
     '#admin': AdminDashboard,
     '#talent': TalentSearch,
 };
@@ -57,10 +57,8 @@ const app = createApp({
             if (authBootstrap.page === 'admin' && !currentHash.value) return AdminDashboard;
             if (authBootstrap.page === 'search' && !currentHash.value) return JobSearch;
             const employerPages = ['#post-job', '#pipeline', '#dashboard', '#billing', '#talent'];
-            const jobSeekerPages = ['#skills-assessment'];
-            const adminPages = ['#admin', '#admin-billing'];
+            const adminPages = ['#admin', '#admin-billing', '#admin-ads'];
             if (employerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'employer') return Home;
-            if (jobSeekerPages.includes(currentRouteHash.value) && authBootstrap.role !== 'job_seeker') return Home;
             if (adminPages.includes(currentRouteHash.value) && authBootstrap.role !== 'admin') return Home;
             if (currentRouteHash.value === '#messages' && !authBootstrap.authenticated) return Home;
             return pages[currentRouteHash.value] ?? Home;

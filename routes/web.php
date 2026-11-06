@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminAdvertisingController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CompanyController;
@@ -22,6 +23,7 @@ Route::get('/companies/{employer}', [AuthController::class, 'companyProfilePage'
 Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 Route::get('/api/companies', [CompanyController::class, 'index'])->name('companies.index');
+Route::get('/api/advertisements/companies', [CompanyController::class, 'sponsoredCompanies'])->name('advertisements.companies');
 Route::get('/api/companies/{employer}', [CompanyController::class, 'show'])->name('companies.profile');
 Route::get('/api/salary-insights', SalaryInsightsController::class)->name('salary-insights.index');
 Route::get('/api/jobs/{jobId}', [JobApplicationController::class, 'show'])->whereNumber('jobId')->name('jobs.show');
@@ -73,6 +75,9 @@ Route::middleware(['auth', 'active.account'])->prefix('api')->group(function () 
         Route::get('/employer-reviews', [AdminController::class, 'reviews'])->name('employer-reviews');
         Route::patch('/employer-reviews/{employerReview}', [AdminController::class, 'moderateReview'])->name('employer-reviews.moderate');
         Route::get('/audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
+        Route::get('/advertising/campaigns', [AdminAdvertisingController::class, 'index'])->name('advertising.campaigns');
+        Route::patch('/advertising/campaigns/{kind}/{campaignId}', [AdminAdvertisingController::class, 'updateCampaign'])->whereNumber('campaignId')->name('advertising.campaigns.update');
+        Route::patch('/advertising/products/{product}', [AdminAdvertisingController::class, 'updateCompanyProduct'])->name('advertising.products.update');
     });
     Route::get('/employer/talent', [BillingController::class, 'talent'])->name('employer.talent');
     Route::get('/employer/talent/{jobSeekerId}/resume', [BillingController::class, 'downloadTalentResume'])->whereNumber('jobSeekerId')->name('employer.talent.resume');

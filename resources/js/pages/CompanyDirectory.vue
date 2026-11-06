@@ -70,6 +70,7 @@ onMounted(() => loadCompanies(Number(new URLSearchParams(window.location.search)
                         <div class="min-w-0 flex-1">
                             <h2 class="break-words text-lg font-bold text-slate-900">{{ company.name }}</h2>
                             <span v-if="company.is_verified" class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800"><i class="ti ti-circle-check" aria-hidden="true" />{{ $t('Verified employer') }}</span>
+                            <span v-if="company.is_sponsored" class="mt-1 ml-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold uppercase text-blue-900"><i class="ti ti-ad" aria-hidden="true" />{{ $t('Sponsored') }}</span>
                         </div>
                     </div>
                     <p class="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-slate-600">{{ company.description || $t('Company information has not been added yet.') }}</p>

@@ -77,6 +77,11 @@ class Employer extends Model
         return $this->hasMany(JobPromotion::class);
     }
 
+    public function adCampaigns(): HasMany
+    {
+        return $this->hasMany(AdCampaign::class);
+    }
+
     public function postJob(array $attributes): Job
     {
         return $this->jobs()->create($attributes);

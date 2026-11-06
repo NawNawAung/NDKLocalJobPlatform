@@ -19,6 +19,7 @@ const featuredError = ref('');
 const companies = ref([]);
 const companiesLoading = ref(true);
 const companiesError = ref('');
+const sponsoredCompanies = ref([]);
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const isEmployer = bootstrap.role === 'employer';
 const regions = bootstrap.regions ?? [];
@@ -91,10 +92,11 @@ function applicationStatusClass(status) {
 }
 
 onMounted(async () => {
-    const [jobsResult, categoriesResult, companiesResult] = await Promise.allSettled([
+    const [jobsResult, categoriesResult, companiesResult, companiesAdsResult] = await Promise.allSettled([
         window.axios.get('/api/jobs/search'),
         window.axios.get('/api/job-categories'),
-        window.axios.get('/api/companies', { params: { page: 1, hiring_only: 1 } }),
+        window.axios.get('/api/companies', { params: { page: 1, hiring_only: 1, exclude_sponsored: 1 } }),
+        window.axios.get('/api/advertisements/companies', { params: { limit: 4 } }),
     ]);
 
     if (jobsResult.status === 'fulfilled') {
@@ -108,6 +110,7 @@ onMounted(async () => {
     } else {
         companiesError.value = 'Company information is unavailable right now.';
     }
+    if (companiesAdsResult.status === 'fulfilled') sponsoredCompanies.value = companiesAdsResult.value.data.data ?? [];
     featuredLoading.value = false;
     companiesLoading.value = false;
 });
@@ -203,6 +206,12 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+        <section v-if="sponsoredCompanies.length" class="bg-blue-50/70 px-5 py-10 sm:px-8 sm:py-12 lg:px-12 xl:px-20" aria-labelledby="sponsored-companies-heading">
+          <div class="mb-5 flex flex-wrap items-end justify-between gap-3"><div><span class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold uppercase text-blue-900"><i class="ti ti-ad" aria-hidden="true"/>{{ $t('Sponsored') }}</span><h2 id="sponsored-companies-heading" class="mt-2 text-2xl font-bold text-[var(--brand-ink)]">{{ $t('Sponsored companies') }}</h2></div><p class="text-xs text-slate-500">{{ $t('Advertisement') }}</p></div>
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <a v-for="item in sponsoredCompanies" :key="item.campaign_id" :href="`/companies/${item.company.id}`" class="group flex min-w-0 items-start gap-3 rounded-xl border border-blue-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-2xl text-blue-800"><i class="ti ti-building" aria-hidden="true"/></span><span class="min-w-0 flex-1"><span class="flex flex-wrap items-center gap-1.5 font-semibold text-slate-900 group-hover:text-blue-800"><span class="break-words">{{ item.company.name }}</span><span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-900">{{ $t('Sponsored') }}</span></span><span class="mt-1 block text-sm text-slate-600">{{ item.company.open_jobs_count }} {{ $t('open jobs') }}</span><span v-if="item.company.location" class="mt-1 block truncate text-xs text-slate-500">{{ item.company.location }}</span></span></a>
+          </div>
+        </section>
         <section class="px-5 py-12 sm:px-8 sm:py-14 lg:px-12 xl:px-20" aria-labelledby="top-companies-heading">
           <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div><p class="text-sm font-semibold text-[var(--brand-primary)]">{{ $t('Meet employers') }}</p><h2 id="top-companies-heading" class="mt-1 text-2xl font-bold leading-8 text-gray-900">{{ $t('Companies hiring') }}</h2></div>
@@ -253,7 +262,7 @@ onMounted(async () => {
         </div>
         <div class="px-20 pb-16 max-sm:px-4 max-sm:pb-10">
           <div class="flex justify-between items-center mb-6">
-            <div class="text-2xl font-bold leading-8 text-gray-900">{{ $t('Featured Jobs') }}</div>
+            <div class="text-2xl font-bold leading-8 text-gray-900">{{ $t('Sponsored Jobs') }}</div>
             <a href="#search" class="flex gap-1.5 items-center">
               <span class="text-sm font-medium text-blue-500">View All Jobs</span>
               <i class="ti ti-arrow-right text-base text-blue-500" />
@@ -265,7 +274,7 @@ onMounted(async () => {
             <article v-for="job in featuredJobs" :key="job.id" class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-blue-200 hover:shadow-sm">
               <div class="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-blue-50 text-lg font-bold text-blue-900">{{ job.company?.slice(0, 2)?.toUpperCase() || 'CO' }}</div>
               <div class="min-w-0 flex-1">
-                <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span v-if="job.is_featured" class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900"><i class="ti ti-star-filled" aria-hidden="true"/>Featured</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="!isEmployer && job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
+                <div class="mb-1 flex flex-wrap items-center gap-2.5"><span class="text-base font-semibold leading-6 text-slate-900">{{ job.title }}</span><span class="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-900"><i class="ti ti-ad" aria-hidden="true"/>{{ $t('Sponsored') }}</span><span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">{{ formatLabel(job.employment_type) }}</span><span v-if="!isEmployer && job.application_status" class="rounded px-2 py-0.5 text-xs font-semibold" :class="applicationStatusClass(job.application_status)">Application: {{ applicationStatusLabel(job.application_status) }}</span></div>
               <div class="flex flex-wrap items-center gap-2 text-sm"><a :href="`/companies/${job.company_id}`" class="font-medium text-blue-800 hover:underline">{{ job.company }}</a><span class="text-slate-400">·</span><span class="text-slate-600">{{ job.location }}</span><span class="text-slate-400">·</span><span class="text-slate-600">{{ formatSalary(job) }}</span></div>
               </div>
               <div class="flex shrink-0 items-center gap-3"><span class="text-xs text-slate-500">{{ postedLabel(job.posted_at) }}</span><a :href="`/#details?job=${job.id}`" class="rounded-lg bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">{{ isEmployer ? 'View job details' : job.application_status ? 'View application' : 'View and apply' }}</a></div>

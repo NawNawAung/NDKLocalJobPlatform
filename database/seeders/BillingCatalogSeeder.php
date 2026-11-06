@@ -47,5 +47,17 @@ class BillingCatalogSeeder extends Seeder
             'is_active' => true,
             'sort_order' => 1,
         ]);
+
+        BillingProduct::firstOrCreate(['slug' => 'featured-company-7-days'], [
+            'name' => 'Sponsored company · 7 days',
+            'description' => 'Show a clearly labelled sponsored company card in the home page spotlight. Set the price and activate it from Admin → Advertising before employers can order it.',
+            'product_type' => 'company_promotion',
+            'price_amount' => 0,
+            'currency' => 'MMK',
+            'duration_days' => 7,
+            'metadata' => ['placement' => 'home_company_spotlight', 'impression_limit' => 5000],
+            'is_active' => false,
+            'sort_order' => 2,
+        ]);
     }
 }

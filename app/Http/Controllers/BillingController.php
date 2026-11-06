@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BillingProduct;
+use App\Models\AdCampaign;
 use App\Models\Employer;
 use App\Models\Invoice;
 use App\Models\Job;
@@ -133,10 +134,16 @@ class BillingController extends Controller
             $item = ['type' => 'subscription', 'name' => $plan->name.' plan', 'amount' => $plan->price_amount, 'plan' => $plan];
         } else {
             $product = BillingProduct::query()->where('slug', $data['product_slug'])->where('is_active', true)->firstOrFail();
-            abort_unless($product->product_type === 'job_promotion', 422, 'This product is not available for employer checkout.');
-            $job = $employer->jobs()->whereKey($data['job_id'] ?? null)->where('status', 'published')->first();
-            abort_unless($job, 422, 'Select one of your published jobs to promote.');
-            $item = ['type' => 'job_promotion', 'name' => $product->name, 'amount' => $product->price_amount, 'product' => $product, 'job' => $job];
+            abort_unless(in_array($product->product_type, ['job_promotion', 'company_promotion'], true), 422, 'This product is not available for employer checkout.');
+            if ($product->product_type === 'job_promotion') {
+                $job = $employer->jobs()->whereKey($data['job_id'] ?? null)->where('status', 'published')->first();
+                abort_unless($job, 422, 'Select one of your published jobs to promote.');
+                $item = ['type' => 'job_promotion', 'name' => $product->name, 'amount' => $product->price_amount, 'product' => $product, 'job' => $job];
+            } else {
+                abort_if(isset($data['job_id']), 422, 'A company promotion applies to the employer profile, not a job.');
+                abort_if($product->price_amount <= 0, 422, 'This company advertising product is not priced yet.');
+                $item = ['type' => 'company_promotion', 'name' => $product->name, 'amount' => $product->price_amount, 'product' => $product];
+            }
         }
 
         $order = DB::transaction(function () use ($request, $employer, $data, $item, $plan, $product, $job) {
@@ -362,6 +369,27 @@ class BillingController extends Controller
                         'job_id' => $item->job_id, 'employer_id' => $order->employer_id, 'order_item_id' => $item->id,
                         'promotion_type' => $type, 'status' => $start->isFuture() ? 'scheduled' : 'active',
                         'starts_at' => $start, 'ends_at' => $start->copy()->addDays($duration),
+                        'metadata' => ['product_name' => $item->item_name],
+                    ]);
+                } elseif ($item->item_type === 'company_promotion' && $item->product && $order->employer) {
+                    $productMeta = $item->product->metadata ?? [];
+                    $placement = $productMeta['placement'] ?? AdCampaign::COMPANY_SPOTLIGHT;
+                    abort_unless($placement === AdCampaign::COMPANY_SPOTLIGHT, 422, 'The company promotion placement is not available.');
+                    $prior = AdCampaign::query()->where('employer_id', $order->employer_id)->where('placement', $placement)
+                        ->whereIn('status', ['active', 'scheduled'])->where('ends_at', '>', now())
+                        ->where(fn ($query) => $query->whereNull('impression_limit')->orWhereColumn('impressions_count', '<', 'impression_limit'))
+                        ->latest('ends_at')->first();
+                    $start = $prior && $prior->ends_at->isFuture() ? $prior->ends_at->copy() : now();
+                    $duration = (int) ($item->product->duration_days ?? 7);
+                    AdCampaign::create([
+                        'employer_id' => $order->employer_id,
+                        'order_item_id' => $item->id,
+                        'campaign_type' => 'featured_company',
+                        'placement' => $placement,
+                        'status' => $start->isFuture() ? 'scheduled' : 'active',
+                        'starts_at' => $start,
+                        'ends_at' => $start->copy()->addDays($duration),
+                        'impression_limit' => $productMeta['impression_limit'] ?? null,
                         'metadata' => ['product_name' => $item->item_name],
                     ]);
                 }

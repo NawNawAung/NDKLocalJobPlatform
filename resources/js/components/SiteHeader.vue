@@ -76,7 +76,6 @@ const links = computed(() => [
     { label: t('Companies'), href: '/companies' },
     { label: t('Salary Insights'), href: '/#insights' },
     ...(props.isAuthenticated && props.userRole === 'job_seeker' ? [
-        { label: t('Skills'), href: '/#skills-assessment' },
         { label: t('My Profile'), href: '/profile' },
     ] : []),
     ...(props.isAuthenticated && props.userRole === 'employer' ? [
@@ -88,6 +87,7 @@ const links = computed(() => [
     ...(props.isAuthenticated && props.userRole === 'admin' ? [
         { label: t('Admin Dashboard'), href: '/admin' },
         { label: t('Billing review'), href: '/admin#admin-billing' },
+        { label: t('Advertising'), href: '/admin#admin-ads' },
     ] : []),
     ...(props.isAuthenticated ? [{ label: t('Messages'), href: '/#messages' }] : []),
 ]);
