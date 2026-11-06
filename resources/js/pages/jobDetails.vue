@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { requestAuthentication } from '../authPrompt.js';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const authenticated = Boolean(bootstrap.authenticated);
@@ -22,9 +23,6 @@ const applicationForm = ref(null);
 const saved = ref(false);
 const profileCanApply = ref(true);
 const reporting = ref(false);
-const accountPromptOpen = ref(false);
-const accountPromptButton = ref(null);
-let accountPromptTrigger = null;
 const reportDialog = ref(false);
 const reportTarget = ref({ type: 'job', id: null });
 const reportReason = ref('');
@@ -91,7 +89,10 @@ async function loadJob() {
         error.value = exception.response?.status === 404
             ? 'This job is no longer available.'
             : 'Could not load this job. Please try again.';
-    } finally { loading.value = false; }
+    } finally {
+        loading.value = false;
+        if (authenticated && job.value) await resumeRequestedAction();
+    }
 }
 
 async function submitApplication() {
@@ -103,30 +104,58 @@ async function submitApplication() {
     if (coverLetter.value.trim()) payload.append('cover_letter', coverLetter.value.trim());
     if (cvFile.value) payload.append('cv', cvFile.value);
     try {
-        const { data } = await window.axios.post(`/api/jobs/${job.value.id}/applications`, payload, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const { data } = await window.axios.post(`/api/jobs/${job.value.id}/applications`, payload, { headers: { 'Content-Type': 'multipart/form-data' }, authPromptContext: 'apply' });
         hasApplied.value = true;
         applicationStatus.value = data.application.status;
         notice.value = data.message;
     } catch (exception) {
-        error.value = exception.response?.data?.errors
-            ? Object.values(exception.response.data.errors).flat().join(' ')
-            : exception.response?.data?.message ?? 'Your application could not be submitted. Please try again.';
+        if (exception.response?.status !== 401) {
+            error.value = exception.response?.data?.errors
+                ? Object.values(exception.response.data.errors).flat().join(' ')
+                : exception.response?.data?.message ?? 'Your application could not be submitted. Please try again.';
+        }
     } finally { submitting.value = false; }
 }
 
 async function toggleSaved() {
-    if (!authenticated || role !== 'job_seeker') {
+    if (!authenticated) {
+        requestAuthentication('save');
+        return;
+    }
+    if (role !== 'job_seeker') {
         error.value = 'Sign in with a job seeker account to save jobs.';
         return;
     }
     saving.value = true;
     error.value = '';
     try {
-        await window.axios.request({ method: saved.value ? 'delete' : 'post', url: `/api/jobs/${job.value.id}/save` });
+        await window.axios.request({ method: saved.value ? 'delete' : 'post', url: `/api/jobs/${job.value.id}/save`, authPromptContext: 'save' });
         saved.value = !saved.value;
         notice.value = saved.value ? 'Job saved to your profile.' : 'Job removed from your saved list.';
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not update your saved jobs.'; }
+    } catch (exception) {
+        if (exception.response?.status !== 401) error.value = exception.response?.data?.message ?? 'Could not update your saved jobs.';
+    }
     finally { saving.value = false; }
+}
+
+async function resumeRequestedAction() {
+    const hashParts = window.location.hash.slice(1).split('?');
+    const query = new URLSearchParams(hashParts[1] ?? '');
+    const action = query.get('auth_action');
+    if (!['apply', 'save', 'reportJob', 'reportEmployer'].includes(action)) return;
+
+    query.delete('auth_action');
+    const cleanHash = `${hashParts[0]}${query.size ? `?${query.toString()}` : ''}`;
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}#${cleanHash}`);
+
+    if (action === 'apply') {
+        await nextTick();
+        applicationForm.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (action === 'save' && !saved.value) {
+        await toggleSaved();
+    } else if (action === 'reportJob' || action === 'reportEmployer') {
+        await reportJob(action === 'reportJob' ? 'job' : 'employer', action === 'reportJob' ? job.value.id : job.value.company.employer_id);
+    }
 }
 
 async function shareJob() {
@@ -140,7 +169,7 @@ async function shareJob() {
 }
 
 async function reportJob(targetType = 'job', targetId = job.value?.id) {
-    if (!authenticated) { error.value = 'Sign in to report content.'; return; }
+    if (!authenticated) { requestAuthentication(targetType === 'job' ? 'reportJob' : 'reportEmployer'); return; }
     reportTrigger = document.activeElement;
     reportTarget.value = { type: targetType, id: targetId };
     reportReason.value = '';
@@ -162,11 +191,17 @@ async function submitReport() {
             target_id: reportTarget.value.id,
             reason: reportReason.value,
             details: reportDetails.value.trim() || null,
-        });
+        }, { authPromptContext: 'report' });
         notice.value = data.message;
         reporting.value = false;
         closeReportDialog();
     } catch (exception) {
+        if (exception.response?.status === 401) {
+            reporting.value = false;
+            closeReportDialog();
+            requestAuthentication('report');
+            return;
+        }
         const validation = exception.response?.data?.errors;
         reportError.value = validation ? Object.values(validation).flat().join(' ') : exception.response?.data?.message ?? 'Could not submit this report.';
     } finally { reporting.value = false; }
@@ -182,34 +217,21 @@ function closeReportDialog() {
 function scrollToApplication() {
     if (!canApply.value) {
         if (!authenticated) {
-            error.value = '';
-            accountPromptTrigger = document.activeElement;
-            accountPromptOpen.value = true;
-            nextTick(() => accountPromptButton.value?.focus());
+            requestAuthentication('apply');
             return;
         }
         error.value = role !== 'job_seeker' ? 'Only job seeker accounts can apply for jobs.' : 'Your job seeker profile is inactive. Update your profile before applying.';
         return;
     }
     applicationForm.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-function closeAccountPrompt() {
-    accountPromptOpen.value = false;
-    nextTick(() => accountPromptTrigger?.focus?.());
 }
 
 function onHashChange() { loadJob(); }
 function onReportKeydown(event) {
-    const accountPrompt = accountPromptOpen.value;
-    if (!reportDialog.value && !accountPrompt) return;
-    if (event.key === 'Escape') {
-        if (accountPrompt) closeAccountPrompt();
-        else closeReportDialog();
-        return;
-    }
+    if (!reportDialog.value) return;
+    if (event.key === 'Escape') { closeReportDialog(); return; }
     if (event.key !== 'Tab') return;
-    const dialog = document.querySelector(accountPrompt ? '[data-account-prompt]' : '[aria-labelledby="report-dialog-title"]');
+    const dialog = document.querySelector('[aria-labelledby="report-dialog-title"]');
     const focusable = dialog?.querySelectorAll('button:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
     if (!focusable?.length) return;
     const first = focusable[0];
@@ -256,17 +278,6 @@ onUnmounted(() => { window.removeEventListener('hashchange', onHashChange); wind
         </div>
     </section>
     <Teleport to="body">
-        <div v-if="accountPromptOpen" class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" @click.self="closeAccountPrompt">
-            <section data-account-prompt class="w-full max-w-md rounded-t-2xl bg-white p-6 shadow-2xl sm:rounded-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="account-prompt-title" aria-describedby="account-prompt-description">
-                <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-2xl text-blue-800"><i class="ti ti-user-plus" aria-hidden="true"/></div>
-                <h2 id="account-prompt-title" class="mt-4 text-center text-xl font-bold text-slate-950">{{ $t('Create an account to apply') }}</h2>
-                <p id="account-prompt-description" class="mt-2 text-center text-sm leading-6 text-slate-600">{{ $t('Create a free job seeker account to apply for this job, or continue browsing without signing up.') }}</p>
-                <div class="mt-6 grid gap-3">
-                    <a ref="accountPromptButton" href="/register" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--brand-primary)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--brand-primary-hover)] focus:outline-none focus:ring-4 focus:ring-blue-200"><i class="ti ti-user-plus" aria-hidden="true"/>{{ $t('Create job seeker account') }}</a>
-                    <button type="button" class="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-100" @click="closeAccountPrompt">{{ $t('Continue browsing') }}</button>
-                </div>
-            </section>
-        </div>
         <div v-if="reportDialog" class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-5" @click.self="closeReportDialog">
             <section class="w-full max-w-xl rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl sm:p-7" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title" aria-describedby="report-dialog-description">
                 <div class="flex items-start justify-between gap-4">

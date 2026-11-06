@@ -42,18 +42,25 @@ class AuthController extends Controller
 
     public function profilePage(): View
     {
-        abort_unless(Auth::user()?->role === 'job_seeker', 403);
+        if (Auth::check()) {
+            abort_unless(Auth::user()->status, 403, 'This account is inactive.');
+            abort_unless(Auth::user()->role === 'job_seeker', 403);
+        }
 
         return $this->appView(null, 'profile');
     }
 
-    public function showLogin(): View
+    public function showLogin(Request $request): View
     {
+        $this->rememberSafeIntendedUrl($request);
+
         return $this->appView('login');
     }
 
-    public function showAdminLogin(): View
+    public function showAdminLogin(Request $request): View
     {
+        $this->rememberSafeIntendedUrl($request);
+
         return $this->appView('login', 'home', true);
     }
 
@@ -62,9 +69,26 @@ class AuthController extends Controller
         return $this->appView(null, 'admin');
     }
 
-    public function showRegister(): View
+    public function showRegister(Request $request): View
     {
+        $this->rememberSafeIntendedUrl($request);
+
         return $this->appView('register');
+    }
+
+    private function rememberSafeIntendedUrl(Request $request): void
+    {
+        $target = $request->query('redirect');
+        if (! is_string($target) || ! str_starts_with($target, '/') || str_starts_with($target, '//') || str_contains($target, '\\') || preg_match('/[\x00-\x1F\x7F]/', $target)) {
+            return;
+        }
+
+        $parts = parse_url($target);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            return;
+        }
+
+        $request->session()->put('url.intended', $target);
     }
 
     public function login(Request $request): RedirectResponse
@@ -407,6 +431,9 @@ class AuthController extends Controller
             'page' => $page,
             'companyId' => $companyId,
             'adminLogin' => $adminLogin,
+            'registrationRole' => $authPage === 'register' && in_array(request()->query('role'), ['job_seeker', 'employer'], true)
+                ? request()->query('role')
+                : null,
             'authenticated' => Auth::check(),
             'role' => $user?->role,
             'userName' => $user?->name,

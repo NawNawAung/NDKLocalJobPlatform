@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { requestAuthentication } from '../authPrompt.js';
 
 const bootstrap = window.__AUTH_BOOTSTRAP__ ?? {};
 const source = bootstrap.profile ?? {};
@@ -85,6 +86,10 @@ const regions = computed(() => bootstrap.regions ?? []);
 const townships = computed(() => regions.value.find((item) => String(item.id) === String(draft.region_id))?.townships ?? []);
 const initials = computed(() => profile.user.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase());
 
+onMounted(() => {
+    if (!bootstrap.authenticated) requestAuthentication('profile');
+});
+
 function snapshot() {
     const { password, password_confirmation, ...safeDraft } = draft;
     return JSON.stringify(safeDraft);
@@ -122,7 +127,7 @@ async function createSkill(type) {
     skillCreating.value[type] = true;
     skillCreateError.value[type] = '';
     try {
-        const { data } = await window.axios.post('/api/skills', { name, type }, { headers: { Accept: 'application/json' } });
+        const { data } = await window.axios.post('/api/skills', { name, type }, { headers: { Accept: 'application/json' }, authPromptContext: 'profile' });
         if (!availableSkills.value.some((skill) => Number(skill.id) === Number(data.skill.id))) availableSkills.value.push(data.skill);
         addSkill(data.skill);
         if (type === 'hard') hardSkillQuery.value = '';
@@ -275,7 +280,7 @@ async function saveProfile() {
     errorMessage.value = '';
     Object.keys(errors).forEach((key) => delete errors[key]);
     try {
-        const { data } = await window.axios.post('/profile', buildFormData(), { headers: { Accept: 'application/json' } });
+        const { data } = await window.axios.post('/profile', buildFormData(), { headers: { Accept: 'application/json' }, authPromptContext: 'profile' });
         updateProfileFromResponse(data.profile);
         successMessage.value = data.message ?? 'Your profile has been saved.';
         clearTimeout(successTimer);
@@ -285,7 +290,7 @@ async function saveProfile() {
             Object.assign(errors, exception.response.data.errors);
             errorMessage.value = 'Some fields need your attention. Review the messages below.';
             requestAnimationFrame(() => document.querySelector('[data-field-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-        } else {
+        } else if (exception.response?.status !== 401) {
             errorMessage.value = exception.response?.data?.message ?? 'Could not save your profile. Please try again.';
         }
     } finally { saving.value = false; }
@@ -307,13 +312,13 @@ async function submitEmployerReview(application) {
     reviewSavingId.value = employerId;
     reviewError.value = '';
     try {
-        const { data } = await window.axios.post(`/api/applications/${application.id}/employer-review`, reviewDrafts[employerId]);
+        const { data } = await window.axios.post(`/api/applications/${application.id}/employer-review`, reviewDrafts[employerId], { authPromptContext: 'review' });
         profile.employer_reviews_by_id ??= {};
         profile.employer_reviews_by_id[employerId] = { status: data.status, rating: reviewDrafts[employerId].rating };
         reviewOpenId.value = null;
         successMessage.value = data.message;
     } catch (exception) {
-        reviewError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not submit the employer review.';
+        if (exception.response?.status !== 401) reviewError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not submit the employer review.';
     } finally { reviewSavingId.value = null; }
 }
 </script>
@@ -514,7 +519,7 @@ async function submitEmployerReview(application) {
             </section>
         </div>
     </section>
-    <section v-else class="mx-auto max-w-3xl px-5 py-16 text-center"><h1 class="text-2xl font-bold text-slate-900">Your seeker profile is unavailable</h1><p class="mt-2 text-sm text-slate-600">Sign in with a job seeker account to view and update your profile.</p></section>
+    <section v-else class="mx-auto max-w-3xl px-5 py-16 text-center"><h1 class="text-2xl font-bold text-slate-900">{{ $t('Your profile is private') }}</h1><p class="mt-2 text-sm text-slate-600">{{ $t('Sign in or create a job seeker account to view and manage your profile.') }}</p><a href="/" class="mt-5 inline-flex rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ $t('Continue browsing') }}</a></section>
 </template>
 
 <style scoped>

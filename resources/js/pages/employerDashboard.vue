@@ -21,11 +21,11 @@ async function loadDashboard() {
     loading.value = true;
     error.value = '';
     try {
-        const { data } = await window.axios.get('/api/employer/dashboard');
+        const { data } = await window.axios.get('/api/employer/dashboard', { authPromptContext: 'dashboard' });
         dashboard.value = data;
         applyProfile(data.profile ?? {});
     } catch (exception) {
-        error.value = exception.response?.status === 403
+        if (exception.response?.status !== 401) error.value = exception.response?.status === 403
             ? 'This dashboard is available to employer accounts.'
             : 'Could not load your employer workspace. Please refresh and try again.';
     } finally { loading.value = false; }
@@ -36,12 +36,12 @@ async function saveProfile() {
     error.value = '';
     notice.value = '';
     try {
-        await window.axios.patch('/api/employer/profile', profileForm);
+        await window.axios.patch('/api/employer/profile', profileForm, { authPromptContext: 'dashboard' });
         dashboard.value.profile = { ...profileForm, social_links: { ...profileForm.social_links }, is_verified: dashboard.value.profile.is_verified };
         profileEditing.value = false;
         notice.value = 'Company profile saved.';
     } catch (exception) {
-        error.value = exception.response?.data?.errors
+        if (exception.response?.status !== 401) error.value = exception.response?.data?.errors
             ? Object.values(exception.response.data.errors).flat().join(' ')
             : exception.response?.data?.message ?? 'Could not save your company profile.';
     } finally { saving.value = false; }
@@ -50,20 +50,20 @@ async function saveProfile() {
 async function requestVerification() {
     saving.value = true; error.value = ''; notice.value = '';
     try {
-        const { data } = await window.axios.post('/api/employer/verification');
+        const { data } = await window.axios.post('/api/employer/verification', {}, { authPromptContext: 'dashboard' });
         dashboard.value.profile.verification_status = 'pending';
         notice.value = data.message;
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not submit the verification request.'; }
+    } catch (exception) { if (exception.response?.status !== 401) error.value = exception.response?.data?.message ?? 'Could not submit the verification request.'; }
     finally { saving.value = false; }
 }
 
 async function updateJob(job, status) {
     error.value = '';
     try {
-        await window.axios.patch(`/api/employer/jobs/${job.id}`, { status });
+        await window.axios.patch(`/api/employer/jobs/${job.id}`, { status }, { authPromptContext: 'dashboard' });
         notice.value = `${job.title} is now ${status}.`;
         await loadDashboard();
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not update this job.'; }
+    } catch (exception) { if (exception.response?.status !== 401) error.value = exception.response?.data?.message ?? 'Could not update this job.'; }
 }
 
 async function deleteJob(job) {

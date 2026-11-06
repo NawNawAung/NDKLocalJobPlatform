@@ -4,7 +4,7 @@ import { locale, setLocale, t } from '../i18n.js';
 
 const props = defineProps({ bootstrap: { type: Object, default: () => window.__AUTH_BOOTSTRAP__ ?? {} } });
 const old = props.bootstrap.old ?? {};
-const role = ref(old.role ?? 'job_seeker');
+const role = ref(old.role ?? props.bootstrap.registrationRole ?? 'job_seeker');
 const name = ref(old.name ?? '');
 const email = ref(old.email ?? '');
 const password = ref('');

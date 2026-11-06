@@ -51,7 +51,7 @@ function messagePreview(message) {
 async function loadConversations({ preserveSelection = true } = {}) {
     if (!authenticated) return;
     try {
-        const { data } = await window.axios.get('/api/conversations', { params: { search: search.value.trim() || undefined } });
+        const { data } = await window.axios.get('/api/conversations', { params: { search: search.value.trim() || undefined }, authPromptContext: 'messages' });
         conversations.value = data.conversations ?? [];
         currentUserId.value = data.current_user_id;
         if (!preserveSelection || !conversations.value.some((item) => item.id === selectedConversationId.value)) {
@@ -63,8 +63,7 @@ async function loadConversations({ preserveSelection = true } = {}) {
             }
         }
     } catch (error) {
-        if (error.response?.status === 401) errorMessage.value = 'Please sign in to view your messages.';
-        else errorMessage.value = 'Unable to load conversations. Please try again.';
+        if (error.response?.status !== 401) errorMessage.value = 'Unable to load conversations. Please try again.';
     }
 }
 
@@ -73,10 +72,10 @@ async function loadCandidates() {
     candidatesLoading.value = true;
     errorMessage.value = '';
     try {
-        const { data } = await window.axios.get('/api/employer/candidates', { params: { search: candidateSearch.value.trim() || undefined } });
+        const { data } = await window.axios.get('/api/employer/candidates', { params: { search: candidateSearch.value.trim() || undefined }, authPromptContext: 'applications' });
         candidateApplications.value = data.applications?.data ?? [];
     } catch (error) {
-        errorMessage.value = error.response?.status === 403
+        errorMessage.value = error.response?.status === 401 ? '' : error.response?.status === 403
             ? 'Candidate discovery is available to employer accounts.'
             : 'Unable to find applicants right now.';
     } finally { candidatesLoading.value = false; }
@@ -86,12 +85,12 @@ async function startCandidateConversation(application) {
     startingConversationId.value = application.id;
     errorMessage.value = '';
     try {
-        const { data } = await window.axios.post(`/api/applications/${application.id}/conversation`);
+        const { data } = await window.axios.post(`/api/applications/${application.id}/conversation`, {}, { authPromptContext: 'messages' });
         sidebarMode.value = 'inbox';
         await loadConversations({ preserveSelection: false });
         await selectConversation(data.conversation.id);
     } catch (error) {
-        errorMessage.value = error.response?.data?.message ?? 'Unable to open a conversation with this candidate.';
+        if (error.response?.status !== 401) errorMessage.value = error.response?.data?.message ?? 'Unable to open a conversation with this candidate.';
     } finally { startingConversationId.value = null; }
 }
 
@@ -102,16 +101,16 @@ async function selectConversation(id) {
     errorMessage.value = '';
     const requestId = ++activeConversationRequest;
     try {
-        const { data } = await window.axios.get(`/api/conversations/${id}/messages`);
+        const { data } = await window.axios.get(`/api/conversations/${id}/messages`, { authPromptContext: 'messages' });
         if (requestId !== activeConversationRequest || selectedConversationId.value !== id) return;
         currentUserId.value = data.current_user_id;
         messages.value = data.messages ?? [];
-        await window.axios.patch(`/api/conversations/${id}/read`);
+        await window.axios.patch(`/api/conversations/${id}/read`, {}, { authPromptContext: 'messages' });
         const conversation = conversations.value.find((item) => item.id === id);
         if (conversation) conversation.unread_count = 0;
         await scrollToLatest();
     } catch (error) {
-        errorMessage.value = error.response?.status === 403
+        if (error.response?.status !== 401) errorMessage.value = error.response?.status === 403
             ? 'You do not have access to this conversation.'
             : 'Unable to load this conversation.';
     } finally {
@@ -122,12 +121,12 @@ async function selectConversation(id) {
 async function refreshSelectedMessages() {
     if (!authenticated || !selectedConversationId.value || conversationLoading.value || sending.value) return;
     try {
-        const { data } = await window.axios.get(`/api/conversations/${selectedConversationId.value}/messages`);
+        const { data } = await window.axios.get(`/api/conversations/${selectedConversationId.value}/messages`, { authPromptContext: 'messages' });
         if (selectedConversationId.value !== data.messages?.[0]?.conversation_id && data.messages?.length) return;
         const previousLatestId = messages.value.at(-1)?.id;
         messages.value = data.messages ?? [];
         if (messages.value.at(-1)?.id !== previousLatestId) {
-            await window.axios.patch(`/api/conversations/${selectedConversationId.value}/read`);
+            await window.axios.patch(`/api/conversations/${selectedConversationId.value}/read`, {}, { authPromptContext: 'messages' });
             await scrollToLatest();
         }
         await loadConversations();
@@ -159,6 +158,7 @@ async function sendMessage() {
     try {
         const { data } = await window.axios.post(`/api/conversations/${selectedConversationId.value}/messages`, form, {
             headers: { 'Content-Type': 'multipart/form-data' },
+            authPromptContext: 'messages',
         });
         messages.value.push(data.message);
         draft.value = '';
@@ -167,6 +167,7 @@ async function sendMessage() {
         await loadConversations();
         await scrollToLatest();
     } catch (error) {
+        if (error.response?.status === 401) return;
         errorMessage.value = error.response?.data?.errors?.body?.[0]
             ?? error.response?.data?.message
             ?? 'Message could not be sent. Check your connection and try again.';

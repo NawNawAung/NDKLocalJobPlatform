@@ -20,7 +20,7 @@ Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::get('/jobs', [AuthController::class, 'searchPage'])->name('jobs.page');
 Route::get('/companies', [AuthController::class, 'companiesPage'])->name('companies.page');
 Route::get('/companies/{employer}', [AuthController::class, 'companyProfilePage'])->whereNumber('employer')->name('companies.show');
-Route::get('/profile', [AuthController::class, 'profilePage'])->middleware(['auth', 'active.account'])->name('profile.page');
+Route::get('/profile', [AuthController::class, 'profilePage'])->name('profile.page');
 Route::get('/api/jobs/search', [JobSearchController::class, 'index'])->name('jobs.search');
 Route::get('/api/companies', [CompanyController::class, 'index'])->name('companies.index');
 Route::get('/api/advertisements/companies', [CompanyController::class, 'sponsoredCompanies'])->name('advertisements.companies');

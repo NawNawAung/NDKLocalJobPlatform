@@ -24,30 +24,30 @@ async function loadCandidates() {
     loading.value = true;
     error.value = '';
     try {
-        const { data } = await window.axios.get('/api/employer/candidates', { params: { search: search.value.trim() || undefined, job_id: jobFilter.value || undefined, status: statusFilter.value || undefined } });
+        const { data } = await window.axios.get('/api/employer/candidates', { params: { search: search.value.trim() || undefined, job_id: jobFilter.value || undefined, status: statusFilter.value || undefined }, authPromptContext: 'applications' });
         applications.value = data.applications?.data ?? [];
         jobs.value = data.jobs ?? [];
     } catch (exception) {
-        error.value = exception.response?.status === 403 ? 'Candidate pipeline is available to employer accounts.' : 'Could not load candidates. Please try again.';
+        if (exception.response?.status !== 401) error.value = exception.response?.status === 403 ? 'Candidate pipeline is available to employer accounts.' : 'Could not load candidates. Please try again.';
     } finally { loading.value = false; }
 }
 
 async function updateStatus(application, status) {
     error.value = '';
     try {
-        await window.axios.patch(`/api/employer/applications/${application.id}`, { status });
+        await window.axios.patch(`/api/employer/applications/${application.id}`, { status }, { authPromptContext: 'applications' });
         application.status = status;
         notice.value = `Application moved to ${status.replaceAll('_', ' ')}.`;
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not update the application.'; }
+    } catch (exception) { if (exception.response?.status !== 401) error.value = exception.response?.data?.message ?? 'Could not update the application.'; }
 }
 
 async function messageCandidate(application) {
     error.value = '';
     try {
-        const { data } = await window.axios.post(`/api/applications/${application.id}/conversation`);
+        const { data } = await window.axios.post(`/api/applications/${application.id}/conversation`, {}, { authPromptContext: 'messages' });
         window.__pendingConversationId = data.conversation.id;
         window.location.hash = 'messages';
-    } catch (exception) { error.value = exception.response?.data?.message ?? 'Could not open a conversation.'; }
+    } catch (exception) { if (exception.response?.status !== 401) error.value = exception.response?.data?.message ?? 'Could not open a conversation.'; }
 }
 
 async function reportCandidate(application) {
@@ -65,12 +65,12 @@ async function scheduleInterview(scheduleForm) {
     scheduleError.value = '';
     scheduleSaving.value = true;
     try {
-        await window.axios.post(`/api/employer/applications/${scheduleFor.value.id}/interviews`, scheduleForm);
+        await window.axios.post(`/api/employer/applications/${scheduleFor.value.id}/interviews`, scheduleForm, { authPromptContext: 'applications' });
         scheduleFor.value.status = 'interview';
         notice.value = 'Interview scheduled and candidate status updated.';
         scheduleFor.value = null;
     } catch (exception) {
-        scheduleError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not schedule the interview.';
+        if (exception.response?.status !== 401) scheduleError.value = exception.response?.data?.errors ? Object.values(exception.response.data.errors).flat().join(' ') : exception.response?.data?.message ?? 'Could not schedule the interview.';
     } finally { scheduleSaving.value = false; }
 }
 

@@ -1,5 +1,5 @@
 import './bootstrap';
-import { computed, createApp, h, ref } from 'vue';
+import { computed, createApp, h, ref, watch } from 'vue';
 import Home from './pages/home.vue';
 import JobDetails from './pages/jobDetails.vue';
 import JobSearch from './pages/jobSearch.vue';
@@ -18,9 +18,11 @@ import AdminDashboard from './pages/AdminDashboard.vue';
 import CompanyDirectory from './pages/CompanyDirectory.vue';
 import CompanyProfile from './pages/CompanyProfile.vue';
 import AdminAdvertising from './pages/AdminAdvertising.vue';
+import AuthPromptModal from './components/AuthPromptModal.vue';
 import SiteHeader from './components/SiteHeader.vue';
 import SiteFooter from './components/SiteFooter.vue';
 import { t } from './i18n.js';
+import { authPromptState, requestAuthentication } from './authPrompt.js';
 
 const pages = {
     '#details': JobDetails,
@@ -64,6 +66,21 @@ const app = createApp({
             return pages[currentRouteHash.value] ?? Home;
         });
 
+        const guestOnlyContexts = {
+            '#post-job': 'postJob',
+            '#pipeline': 'applications',
+            '#dashboard': 'dashboard',
+            '#billing': 'billing',
+            '#talent': 'talent',
+            '#messages': 'messages',
+            '#admin': 'admin',
+            '#admin-billing': 'admin',
+            '#admin-ads': 'admin',
+        };
+        watch(currentRouteHash, (route) => {
+            if (!authBootstrap.authenticated && guestOnlyContexts[route]) requestAuthentication(guestOnlyContexts[route]);
+        }, { immediate: true });
+
         const sharedHeader = showSiteChrome ? h(SiteHeader, {
             isAuthenticated: authBootstrap.authenticated,
             csrfToken: authBootstrap.csrfToken,
@@ -80,6 +97,10 @@ const app = createApp({
             sharedHeader,
             h('main', { id: 'page-content' }, [h(currentPage.value)]),
             sharedFooter,
+            h(AuthPromptModal, {
+                open: authPromptState.open,
+                context: authPromptState.context,
+            }),
         ]);
     },
 });
