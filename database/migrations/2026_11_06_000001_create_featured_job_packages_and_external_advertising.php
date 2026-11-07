@@ -15,8 +15,10 @@ return new class extends Migration
             $table->unsignedSmallInteger('slots_total');
             $table->unsignedSmallInteger('slots_remaining');
             $table->unsignedSmallInteger('promotion_duration_days');
-            $table->timestamp('purchased_at');
-            $table->timestamp('expires_at')->index();
+            // Use DATETIME for required application-supplied values to avoid
+            // legacy MySQL TIMESTAMP implicit-default constraints.
+            $table->dateTime('purchased_at');
+            $table->dateTime('expires_at')->index();
             $table->timestamps();
             $table->index(['employer_id', 'expires_at']);
         });
