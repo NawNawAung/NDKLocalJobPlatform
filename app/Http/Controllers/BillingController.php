@@ -53,6 +53,9 @@ class BillingController extends Controller
         $employer = $this->employer($request);
         $plan = $this->entitlements->currentPlan($employer);
         $subscription = $this->entitlements->currentSubscription($employer);
+        $planFeatures = fn (PricingPlan $source) => $source->features
+            ->reject(fn (PlanFeature $feature) => in_array($feature->feature_key, ['candidate_preview_limit', 'candidate_search', 'candidate_contact_view'], true))
+            ->mapWithKeys(fn (PlanFeature $feature) => [$feature->feature_key => $feature->feature_value]);
         $jobLimit = (int) ($plan?->feature('max_active_jobs', 1) ?? 1);
         $cvLimit = (int) ($plan?->feature('candidate_cv_downloads', 0) ?? 0);
         $periodStart = $this->entitlements->monthStart();
@@ -62,14 +65,14 @@ class BillingController extends Controller
                 'id' => $plan->id, 'name' => $plan->name, 'slug' => $plan->slug,
                 'description' => $plan->description, 'price_amount' => $plan->price_amount,
                 'currency' => $plan->currency, 'billing_interval' => $plan->billing_interval,
-                'features' => $plan->features->mapWithKeys(fn (PlanFeature $feature) => [$feature->feature_key => $feature->feature_value]),
+                'features' => $planFeatures($plan),
                 'subscription_ends_at' => $subscription?->ends_at?->toIso8601String(),
             ] : null,
             'usage' => [
                 'active_jobs' => Job::published()->where('employer_id', $employer->id)->count(),
                 'active_jobs_limit' => $jobLimit,
-                'candidate_cv_downloads' => $this->entitlements->usage($employer, 'candidate_cv_downloads'),
-                'candidate_cv_downloads_limit' => $cvLimit,
+                'application_cv_downloads' => $this->entitlements->usage($employer, 'candidate_cv_downloads', 'application'),
+                'application_cv_downloads_limit' => $cvLimit,
                 'period_start' => $periodStart->toDateString(),
             ],
             'plans' => PricingPlan::query()->where('is_active', true)->orderBy('sort_order')->with('features')->get()
@@ -77,7 +80,7 @@ class BillingController extends Controller
                     'id' => $item->id, 'name' => $item->name, 'slug' => $item->slug,
                     'description' => $item->description, 'price_amount' => $item->price_amount,
                     'currency' => $item->currency, 'billing_interval' => $item->billing_interval,
-                    'features' => $item->features->mapWithKeys(fn (PlanFeature $feature) => [$feature->feature_key => $feature->feature_value]),
+                    'features' => $planFeatures($item),
                 ]),
             'products' => BillingProduct::query()->where('is_active', true)->orderBy('sort_order')->get()
                 ->map(fn (BillingProduct $product) => [
@@ -543,20 +546,10 @@ class BillingController extends Controller
             'keyword' => ['nullable', 'string', 'max:100'], 'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'township_id' => ['nullable', 'integer', 'exists:townships,id'], 'experience_min' => ['nullable', 'integer', 'min:0', 'max:60'],
             'employment_type' => ['nullable', Rule::in(['full_time', 'part_time', 'contract', 'temporary', 'internship'])],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
-        $limit = (int) $this->entitlements->value($employer, 'candidate_preview_limit', 5);
-        $used = $this->entitlements->usage($employer, 'candidate_profile_preview');
-        $available = $limit < 0 ? PHP_INT_MAX : max(0, $limit - $used);
-        if ($available === 0) {
-            return response()->json(['message' => 'You have used this month’s candidate profile previews. Upgrade to Professional for full candidate search.', 'upgrade_required' => true, 'candidates' => [], 'remaining' => 0], 403);
-        }
-
-        $viewedIds = $limit < 0 ? [] : $employer->featureUsages()
-            ->where('feature_key', 'candidate_profile_preview')->where('period_start', $this->entitlements->monthStart())
-            ->where('resource_type', 'job_seeker')->pluck('resource_id')->filter()->unique()->all();
         $query = \App\Models\JobSeeker::query()->where('status', true)->where('profile_searchable', true)
             ->with(['user:id,name,email', 'region:id,name', 'township:id,name'])
-            ->when($viewedIds, fn ($query) => $query->whereNotIn('id', $viewedIds))
             ->when($data['keyword'] ?? null, function ($query, $keyword) {
                 $query->where(function ($q) use ($keyword) {
                     $q->where('professional_title', 'like', "%{$keyword}%")
@@ -569,46 +562,41 @@ class BillingController extends Controller
             ->when(isset($data['experience_min']), fn ($query) => $query->where('years_experience', '>=', $data['experience_min']))
             ->when($data['employment_type'] ?? null, fn ($query, $type) => $query->where('employment_type', $type))
             ->orderByDesc('updated_at');
-        $candidates = $query->limit(min(30, $available))->get();
-        $canViewContact = (bool) $this->entitlements->value($employer, 'candidate_contact_view', false);
-        $canDownload = (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0) !== 0;
-        foreach ($candidates as $candidate) {
-            $this->entitlements->record($employer, 'candidate_profile_preview', 1, 'job_seeker', $candidate->id);
-        }
+        $candidates = $query->paginate(30)->withQueryString();
 
         return response()->json([
-            'candidates' => $candidates->map(fn ($candidate) => [
+            'candidates' => $candidates->getCollection()->map(fn ($candidate) => [
                 'id' => $candidate->id,
-                'name' => $canViewContact ? $candidate->user?->name : 'Candidate profile',
-                'email' => $canViewContact ? $candidate->user?->email : null,
+                'name' => $candidate->user?->name,
+                'email' => $candidate->user?->email,
                 'title' => $candidate->professional_title ?: $candidate->desired_job_title,
                 'experience' => $candidate->years_experience,
                 'skills' => $candidate->skills ?? [],
+                'bio' => $candidate->bio,
                 'location' => collect([$candidate->township?->name, $candidate->region?->name])->filter()->join(', '),
                 'has_cv' => filled($candidate->cv_path),
-                'cv_url' => $canDownload && filled($candidate->cv_path) ? "/api/employer/talent/{$candidate->id}/resume" : null,
-                'portfolio_url' => $canViewContact ? $candidate->portfolio_url : null,
-                'social_links' => $canViewContact ? ($candidate->social_links ?? []) : [],
+                'cv_url' => filled($candidate->cv_path) ? "/api/employer/talent/{$candidate->id}/resume" : null,
+                'portfolio_url' => $candidate->portfolio_url,
+                'social_links' => $candidate->social_links ?? [],
                 'employment_type' => $candidate->employment_type,
                 'work_mode' => $candidate->work_mode,
             ]),
-            'remaining' => $limit < 0 ? null : max(0, $available - $candidates->count()),
-            'unlimited' => $limit < 0,
-            'can_view_contact' => $canViewContact,
-            'can_download_cv' => $canDownload,
-            'upgrade_required' => ! $canViewContact,
+            'pagination' => [
+                'current_page' => $candidates->currentPage(),
+                'last_page' => $candidates->lastPage(),
+                'per_page' => $candidates->perPage(),
+                'total' => $candidates->total(),
+                'from' => $candidates->firstItem(),
+                'to' => $candidates->lastItem(),
+            ],
         ]);
     }
 
     public function downloadTalentResume(Request $request, int $jobSeekerId)
     {
-        $employer = $this->employer($request);
-        $limit = (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0);
-        $remaining = $this->entitlements->remaining($employer, 'candidate_cv_downloads', $limit);
-        abort_if($remaining === 0, 403, 'Your plan has reached its monthly candidate CV download limit. Upgrade your plan to continue.');
+        $this->employer($request);
         $candidate = \App\Models\JobSeeker::query()->whereKey($jobSeekerId)->where('status', true)->where('profile_searchable', true)->firstOrFail();
         abort_unless($candidate->cv_path && Storage::disk('local')->exists($candidate->cv_path), 404);
-        $this->entitlements->record($employer, 'candidate_cv_downloads', 1, 'job_seeker', $candidate->id);
 
         return Storage::disk('local')->download($candidate->cv_path, basename($candidate->cv_original_name ?: $candidate->cv_path));
     }

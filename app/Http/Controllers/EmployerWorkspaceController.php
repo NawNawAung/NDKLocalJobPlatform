@@ -43,8 +43,8 @@ class EmployerWorkspaceController extends Controller
             'billing' => [
                 'plan_name' => $this->entitlements->currentPlan($employer)?->name ?? 'Free',
                 'active_job_limit' => (int) $this->entitlements->value($employer, 'max_active_jobs', 1),
-                'candidate_cv_limit' => (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0),
-                'candidate_cv_used' => $this->entitlements->usage($employer, 'candidate_cv_downloads'),
+                'application_cv_limit' => (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0),
+                'application_cv_used' => $this->entitlements->usage($employer, 'candidate_cv_downloads', 'application'),
             ],
             'profile' => [
                 'name' => $request->user()->name,
@@ -274,7 +274,7 @@ class EmployerWorkspaceController extends Controller
         $path = $application->cv_path ?: $application->jobSeeker?->cv_path;
         abort_unless($path && Storage::disk('local')->exists($path), 404);
         $limit = (int) $this->entitlements->value($employer, 'candidate_cv_downloads', 0);
-        abort_if($this->entitlements->remaining($employer, 'candidate_cv_downloads', $limit) === 0, 403, 'Your plan has reached its monthly candidate CV download limit. Upgrade your plan to continue.');
+        abort_if($this->entitlements->remaining($employer, 'candidate_cv_downloads', $limit, 'application') === 0, 403, 'Your plan has reached its monthly application CV download limit. Upgrade your plan to continue.');
         $this->entitlements->record($employer, 'candidate_cv_downloads', 1, 'application', $application->id);
 
         return Storage::disk('local')->download($path, basename($path));

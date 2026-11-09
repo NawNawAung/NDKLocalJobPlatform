@@ -37,21 +37,22 @@ class EmployerEntitlementService
         return now()->startOfMonth();
     }
 
-    public function usage(Employer $employer, string $feature): int
+    public function usage(Employer $employer, string $feature, ?string $resourceType = null): int
     {
         return (int) $employer->featureUsages()
             ->where('feature_key', $feature)
+            ->when($resourceType, fn ($query) => $query->where('resource_type', $resourceType))
             ->where('period_start', $this->monthStart())
             ->sum('quantity');
     }
 
-    public function remaining(Employer $employer, string $feature, int $limit): ?int
+    public function remaining(Employer $employer, string $feature, int $limit, ?string $resourceType = null): ?int
     {
         if ($limit < 0) {
             return null;
         }
 
-        return max(0, $limit - $this->usage($employer, $feature));
+        return max(0, $limit - $this->usage($employer, $feature, $resourceType));
     }
 
     public function record(Employer $employer, string $feature, int $quantity = 1, ?string $resourceType = null, ?int $resourceId = null, array $context = []): FeatureUsage
